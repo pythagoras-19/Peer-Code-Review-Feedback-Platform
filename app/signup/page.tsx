@@ -81,7 +81,6 @@ export default function SignupPage() {
         // Clear form
         setEmail('');
         setPassword('');
-        // Optionally redirect to login after a delay
         setTimeout(() => {
           router.push('/login');
         }, 3000);
