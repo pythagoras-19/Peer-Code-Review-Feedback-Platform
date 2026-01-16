@@ -6,12 +6,8 @@ A Next.js + TypeScript frontend for peer code review with Supabase authenticatio
 
 ```bash
 npm install
-cp .env.local.example .env.local
-# Add your Supabase URL and anon key to .env.local
 npm run dev
 ```
-
-Get Supabase credentials from: https://app.supabase.com → Project → Settings > API
 
 ## Features
 
