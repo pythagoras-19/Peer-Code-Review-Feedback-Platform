@@ -9,7 +9,8 @@
     "lint": "next lint",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",
@@ -25,11 +26,12 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.2.1",
-    "@vitest/ui": "^1.0.4",
+    "@vitest/coverage-v8": "1.6.1",
+    "@vitest/ui": "1.6.1",
     "eslint": "^8.0.0",
     "eslint-config-next": "^15.0.0",
     "jsdom": "^23.0.1",
     "typescript": "^5.0.0",
-    "vitest": "^1.0.4"
+    "vitest": "1.6.1"
   }
 }
