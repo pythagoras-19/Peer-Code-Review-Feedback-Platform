@@ -80,9 +80,7 @@ export default function SignupPage() {
       if (result.error) {
         setError(result.error.message)
       } else {
-        setSuccess(
-          'Account created! Check your email to confirm your account.'
-        )
+        setSuccess('Account created successfully!')
         // Clear form
         setEmail('')
         setPassword('')
