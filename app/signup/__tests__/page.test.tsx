@@ -92,7 +92,7 @@ describe('SignupPage', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/check your email to confirm/i)
+        screen.getByText(/account created successfully/i)
       ).toBeInTheDocument()
     })
 
