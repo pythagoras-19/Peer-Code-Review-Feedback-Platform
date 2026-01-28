@@ -54,48 +54,95 @@ const mockActivities = [
 ];
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [userEmail, setUserEmail] = useState<string>('');
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [userEmail, setUserEmail] = useState<string>('')
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+  const [users, setUsers] = useState<Array<{ user_id: string; display_name: string }>>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersError, setUsersError] = useState<string>('')
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
     const checkSession = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data } = await supabase.auth.getSession()
         
-        if (cancelled) return;
+        if (cancelled) return
 
         if (!data.session) {
-          router.push('/login');
+          router.push('/login')
         } else {
-          setUserEmail(data.session.user.email || 'User');
-          setLoading(false);
+          setUserEmail(data.session.user.email || 'User')
+          setCurrentUserId(data.session.user.id)
+          setLoading(false)
         }
       } catch (err) {
-        console.error('Error checking session:', err);
+        console.error('Error checking session:', err)
         if (!cancelled) {
-          router.push('/login');
+          router.push('/login')
         }
       }
-    };
+    }
 
-    checkSession();
+    checkSession()
 
     return () => {
-      cancelled = true;
-    };
-  }, [router]);
+      cancelled = true
+    }
+  }, [router])
+
+  useEffect(() => {
+    if (!currentUserId) return
+
+    let cancelled = false
+
+    const fetchUsers = async () => {
+      setUsersLoading(true)
+      setUsersError('')
+
+      try {
+        const { data, error } = await supabase
+          .from('user_directory')
+          .select('user_id, display_name')
+          .neq('user_id', currentUserId)
+
+        if (cancelled) return
+
+        if (error) {
+          setUsersError('Failed to load users')
+          console.error('Error fetching users:', error)
+        } else {
+          setUsers(data || [])
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setUsersError('Failed to load users')
+          console.error('Error fetching users:', err)
+        }
+      } finally {
+        if (!cancelled) {
+          setUsersLoading(false)
+        }
+      }
+    }
+
+    fetchUsers()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentUserId])
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
-      router.push('/login');
+      await supabase.auth.signOut()
+      router.push('/login')
     } catch (err) {
-      console.error('Error logging out:', err);
+      console.error('Error logging out:', err)
     }
-  };
+  }
 
   if (loading) {
     return (
@@ -120,9 +167,10 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <div className="dashboard-grid">
-          {/* My Assignments */}
-          <section className="dashboard-section">
+        <div className="dashboard-layout">
+          <div className="dashboard-grid">
+            {/* My Assignments */}
+            <section className="dashboard-section">
             <h2 className="section-title">My Assignments</h2>
             <div className="section-content">
               {mockAssignments.map((assignment) => (
@@ -186,6 +234,33 @@ export default function DashboardPage() {
               </ul>
             </div>
           </section>
+          </div>
+
+          {/* Available Reviewers Sidebar */}
+          <aside className="dashboard-sidebar">
+            <section className="dashboard-section">
+              <h2 className="section-title">Available Reviewers</h2>
+              <div className="section-content">
+                {usersLoading ? (
+                  <div className="dashboard-loading">Loading...</div>
+                ) : usersError ? (
+                  <div className="dashboard-error">{usersError}</div>
+                ) : users.length === 0 ? (
+                  <p className="empty-state">No users available</p>
+                ) : (
+                  <ul className="user-list">
+                    {users.map((user) => (
+                      <li key={user.user_id} className="user-item">
+                        <div className="user-card">
+                          <span className="user-name">{user.display_name}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
+          </aside>
         </div>
       </div>
     </AppShell>
