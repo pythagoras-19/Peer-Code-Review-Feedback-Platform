@@ -5,7 +5,7 @@ export type MockSupabaseAuthError = {
   status?: number
   code?: string
 }
-
+// Create a mock Supabase client with customizable method responses
 export const createMockSupabaseClient = (overrides?: {
   signUp?: { data?: any; error?: MockSupabaseAuthError | null }
   signInWithPassword?: { data?: any; error?: MockSupabaseAuthError | null }
@@ -99,6 +99,7 @@ export const createMockSupabaseClient = (overrides?: {
   },
 })
 
+// Helper to create a mock Supabase auth error
 export const mockSupabaseError = (
   message: string,
   status?: number,

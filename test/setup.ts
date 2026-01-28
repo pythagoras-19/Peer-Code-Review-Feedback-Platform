@@ -8,7 +8,7 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
 // Global mocks
 global.fetch = vi.fn()
 
-// Suppress console errors in tests (optional)
+// Suppress console errors in tests
 const originalError = console.error
 beforeAll(() => {
   console.error = (...args: any[]) => {

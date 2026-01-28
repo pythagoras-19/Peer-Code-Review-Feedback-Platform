@@ -167,6 +167,15 @@ export default function DashboardPage() {
           </button>
         </div>
 
+        <div className="dashboard-actions">
+          <Link href="/assignments/new" className="btn btn-primary">
+            Start Assignment
+          </Link>
+          <Link href="/reviews" className="btn btn-primary">
+            Review Assigned Code
+          </Link>
+        </div>
+
         <div className="dashboard-layout">
           <div className="dashboard-grid">
             {/* My Assignments */}
