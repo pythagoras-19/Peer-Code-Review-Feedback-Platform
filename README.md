@@ -134,6 +134,10 @@ Current policies protect:
 
 ## Database Schema (High Level)
 
+![Database Schema Diagram](./supabase-schema.png)
+
+*The diagram above illustrates the complete database schema, showing table relationships and entities protected by Row Level Security policies.*
+
 ### Core Tables
 
 **user_profiles**
