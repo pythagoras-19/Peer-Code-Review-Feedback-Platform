@@ -55,6 +55,7 @@ This platform solves these problems by:
 | Layer | Technology | Role |
 |-------|-----------|------|
 | **Frontend** | [Next.js 15 (App Router)](https://nextjs.org/docs) | Server and client components, routing, UI |
+| **Styling** | Custom CSS | Semantic class-based styling (see [STYLING.md](STYLING.md)) |
 | **Database** | [Supabase](https://supabase.com/docs) (Auth, RLS, Realtime) | Data storage, RLS policies, real-time queries |
 | **Authentication** | Supabase Auth | User registration, login, session management |
 | **Testing** | [Vitest](https://vitest.dev/), jsdom | Unit tests, integration tests, RLS validation |
@@ -439,7 +440,7 @@ npm run test:coverage
 - **No semicolons** - This codebase uses ASI (Automatic Semicolon Insertion); be consistent
 - **TypeScript** - Use types for all data structures and function parameters
 - **React Hooks** - Use functional components with hooks, not class components
-- **CSS Classes** - Follow existing naming (e.g., `dashboard-section`, `btn btn-primary`)
+- **CSS Classes** - Follow existing naming (e.g., `dashboard-section`, `btn btn-primary`). See [STYLING.md](STYLING.md) for the complete styling guide
 
 ### Git Workflow
 
@@ -471,6 +472,7 @@ npm run build
 - `lib/supabaseClient.ts` - Supabase client initialization
 - `tests/db/` - Database integration tests
 - `styles/globals.css` - Shared styles
+- `STYLING.md` - Complete styling guide and best practices
 - `DB_TESTING.md` - Guide to running and writing RLS tests
 
 ### Getting Help
