@@ -1,0 +1,80 @@
+@startuml
+
+autolink
+
+actor Student
+participant "Next.js UI" as UI
+participant "API (Next.js route handler / server action)" as API
+participant "Supabase Auth" as Auth
+database "Supabase Postgres (RLS)" as DB
+
+== Submission Flow ==
+
+UI -> Auth: getSession/getUser
+alt Unauthenticated user
+  Auth --> UI: no session
+  UI --> Student: Prompt login
+else Authenticated user
+  Auth --> UI: session + user
+  UI -> API: GET assignment details
+  API -> DB: SELECT assignment by id
+  alt RLS denial / permission error
+    DB --> API: error (RLS denied)
+    API --> UI: error response
+    UI --> Student: Show access error
+  else Success
+    DB --> API: assignment data
+    API --> UI: assignment details
+    UI --> Student: Render assignment
+
+    Student -> UI: Submit code snippet
+    UI -> API: POST submission (code, assignment_id)
+    API -> DB: INSERT submission
+    alt Submission deadline passed
+      DB --> API: error (deadline constraint)
+      API --> UI: error response
+      UI --> Student: Show deadline error
+    else RLS denial / permission error
+      DB --> API: error (RLS denied)
+      API --> UI: error response
+      UI --> Student: Show permission error
+    else Success
+      DB --> API: submission created
+      API --> UI: success response
+      UI --> Student: Success + navigate to submission detail/history
+    end
+  end
+end
+
+== Later: Peer Review Cycle ==
+
+API -> DB: Assign reviewers (manual trigger or scheduled job)
+DB --> API: review assignments created
+
+Student -> UI: Reviewer fetches assigned reviews
+UI -> API: GET assigned reviews
+API -> DB: SELECT review_assignments
+DB --> API: assigned reviews
+API --> UI: assigned reviews list
+
+Student -> UI: Submit review (rubric + comments)
+UI -> API: POST review
+API -> DB: INSERT review
+alt RLS denial / permission error
+  DB --> API: error (RLS denied)
+  API --> UI: error response
+  UI --> Student: Show permission error
+else Success
+  DB --> API: review created
+  API --> UI: success response
+  UI --> Student: Review submitted confirmation
+end
+
+Student -> UI: Author fetches received feedback
+UI -> API: GET received reviews
+API -> DB: SELECT reviews for author
+DB --> API: review feedback
+API --> UI: feedback data
+UI --> Student: Display peer feedback
+
+@enduml

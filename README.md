@@ -93,6 +93,30 @@ Traditional architectures often separate concerns: frontend, backend API, databa
 
 ---
 
+## Main Application Flow – Submission & Peer Review
+
+![Main Application Flow Sequence Diagram](./main-flow-sequence.png)
+
+### 1. Authentication & Session Validation
+The Next.js UI begins by validating the session through Supabase Auth using session/user lookups. This step determines whether the Student (Author) is authenticated before any protected data access occurs. Unauthenticated requests short-circuit at the UI layer, while authenticated requests proceed to downstream API and database operations.
+
+### 2. Assignment Access & Authorization
+The UI requests assignment details through the API, which queries Supabase Postgres. Row Level Security (RLS) enforces access rules at the database layer; unauthorized reads are denied by the database and the resulting permission error is propagated back through the API to the UI for user-facing handling.
+
+### 3. Submission Creation Flow
+The Student (Author) submits a code snippet through the UI, which sends a submission request to the API. The API evaluates submission deadline constraints and then attempts to insert the submission in Supabase Postgres. RLS policies guard the insert; permission failures return an error, while successful inserts return a confirmation. On success, the UI transitions to the submission detail/history view.
+
+### 4. Peer Review Assignment (Asynchronous)
+Reviewer assignment happens later through a background Reviewer Assignment Job. This process is decoupled from the interactive submission request and creates review assignments after the initial submission flow completes.
+
+### 5. Review Completion Flow
+The Reviewer retrieves assigned reviews through the UI, which calls the API to fetch review assignments from Supabase Postgres. The Reviewer submits rubric ratings and comments via the UI, and the API persists the review to the database. RLS enforcement applies during review insertion to ensure only assigned reviewers can submit.
+
+### 6. Feedback Retrieval
+The original author later fetches received feedback through the UI. The API queries Supabase Postgres for reviews tied to the author’s submissions, and RLS ensures that only feedback for the author’s own submissions is returned.
+
+---
+
 ## Security Model
 
 ### Row Level Security (RLS) Explained
