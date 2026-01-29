@@ -4,6 +4,7 @@ import { describe, it, beforeAll, afterAll, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createTestUser, deleteTestUser, assertSupabaseReachable } from './helpers'
 
+// Helper to wait for user_profiles row to be created
 async function waitForProfile(userId: string, client: SupabaseClient, timeoutMs = 20000) {
   const start = Date.now()
 
@@ -16,13 +17,13 @@ async function waitForProfile(userId: string, client: SupabaseClient, timeoutMs 
 
     if (error) throw error
     if (data) return data
-
+    // Wait before retrying
     await new Promise(r => setTimeout(r, 300))
   }
 
   throw new Error(`Timed out waiting for user_profiles row for user_id=${userId}`)
 }
-
+// Tests for RLS policies on user_profiles table
 describe('user_profiles RLS', () => {
   let userA: { userId: string; email: string; client: SupabaseClient } | null = null
   let userB: { userId: string; email: string; client: SupabaseClient } | null = null
@@ -40,12 +41,13 @@ describe('user_profiles RLS', () => {
   it('authenticated user CAN select their own user_profiles row', async () => {
     if (!userA) throw new Error('userA not initialized')
 
+    // Try to select own profile
     const { data, error } = await userA.client
       .from('user_profiles')
       .select('*')
       .eq('user_id', userA.userId)
       .maybeSingle()
-
+    // Expect to succeed
     expect(error).toBeNull()
     expect(data).not.toBeNull()
     expect(data?.user_id).toBe(userA.userId)
@@ -53,7 +55,7 @@ describe('user_profiles RLS', () => {
 
   it("authenticated user CANNOT select another user's profile due to RLS", async () => {
     if (!userA || !userB) throw new Error('users not initialized')
-
+    // Try to select other user's profile
     const { data, error } = await userA.client
       .from('user_profiles')
       .select('*')
@@ -64,6 +66,7 @@ describe('user_profiles RLS', () => {
     expect(data).toBeNull()
   }, 60000)
 
+  // Cleanup test users
   afterAll(async () => {
     if (userA?.userId) await deleteTestUser(userA.userId)
     if (userB?.userId) await deleteTestUser(userB.userId)
