@@ -30,10 +30,10 @@ This platform solves these problems by:
 ### Currently Implemented
 
 - **User Authentication** - Supabase Auth (email/password, extensible to SSO)
-- **User Profiles & Directory** - Students can view available peers for assignment
+- **User Profiles & Directory** - Students can view available peers for peer review assignment
 - **Dashboard** - Overview of assignments, reviews, and recent activity
-- **Assignment Submission UI** - Form to submit code with title and language selection
-- **Review Assignment UI** - Select multiple reviewers for a submission
+- **Assignment Creation UI** - Form for students to submit code with title and language selection
+- **Peer Reviewer Selection UI** - Students explicitly select peer reviewers from the user directory
 - **Code Review Interface** - Structured review page with code display and comment textarea
 - **Row Level Security** - Database policies enforce user isolation and access control
 
@@ -136,7 +136,7 @@ Current policies protect:
 
 ![Database Schema Diagram](./supabase-schema.png)
 
-*The diagram above illustrates the complete database schema, showing table relationships and entities protected by Row Level Security policies.*
+*The diagram above illustrates the high-level database schema and table relationships enforced by Row Level Security (RLS).*
 
 ### Core Tables
 
@@ -167,7 +167,7 @@ RLS: Users can only read their own profile. Users can read all profiles in the d
 | created_at | timestamp with time zone | NO | now() AT TIME ZONE 'utc' |
 | updated_at | timestamp with time zone | NO | now() AT TIME ZONE 'utc' |
 
-RLS: Users can only read assignments created by instructors (role-based). Students can view assignments they're working on.
+RLS: Students can read assignments they created. Students can also read assignments where they are assigned as reviewers.
 
 ---
 
@@ -265,6 +265,14 @@ review_assignments
 reviews
     └── many:1 ← review_assignments (review_assignment_id)
 ```
+
+---
+
+## Database Schema UML
+
+![Database Schema UML Diagram](./supabase-schema-uml.png)
+
+*This UML diagram provides a structural view of the database entities, attributes, and cardinality relationships used in the peer review workflow.*
 
 ---
 
