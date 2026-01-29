@@ -54,10 +54,10 @@ This platform solves these problems by:
 
 | Layer | Technology | Role |
 |-------|-----------|------|
-| **Frontend** | Next.js 15 (App Router) | Server and client components, routing, UI |
-| **Database** | Supabase (PostgreSQL) | Data storage, RLS policies, real-time queries |
+| **Frontend** | [Next.js 15 (App Router)](https://nextjs.org/docs) | Server and client components, routing, UI |
+| **Database** | [Supabase](https://supabase.com/docs) (Auth, RLS, Realtime) | Data storage, RLS policies, real-time queries |
 | **Authentication** | Supabase Auth | User registration, login, session management |
-| **Testing** | Vitest, jsdom | Unit tests, integration tests, RLS validation |
+| **Testing** | [Vitest](https://vitest.dev/), jsdom | Unit tests, integration tests, RLS validation |
 
 ### Why Supabase + RLS?
 
