@@ -7,7 +7,7 @@ export async function assignReviewerForSubmission(submissionId: string, reviewer
     return { ok: false, error: 'submissionId and reviewerId are required' }
   }
 
-  const supabase = createSupabaseServerClient()
+  const supabase = await createSupabaseServerClient()
 
   const { data: authData, error: authError } = await supabase.auth.getUser()
   if (authError) return { ok: false, error: authError.message }
