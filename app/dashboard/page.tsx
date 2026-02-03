@@ -7,7 +7,7 @@ import AppShell from '@/components/AppShell'
 import { supabase } from '@/lib/supabaseClient'
 import { useReviewAssignments } from '@/lib/hooks/useReviewAssignments'
 
-// Mock data
+// Mock data (MVP only)
 const mockAssignments = [
   {
     id: 1,
@@ -57,47 +57,43 @@ type SubmissionRow = {
   language: string
   created_at: string
   code_text: string
-  assignments: Assignment | null
-  user_profiles: Author | null
+  assignments: Assignment[] | null
+  user_profiles: Author[] | null
 }
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [userEmail, setUserEmail] = useState<string>('')
-  const [currentUserId, setCurrentUserId] = useState<string>('')
 
-  const { reviewAssignments, loading: reviewsLoading, error: reviewsError } = useReviewAssignments()
+  const [loading, setLoading] = useState(true)
+  const [userEmail, setUserEmail] = useState('')
+  const [currentUserId, setCurrentUserId] = useState('')
+
+  const { reviewAssignments, loading: reviewsLoading, error: reviewsError } =
+    useReviewAssignments()
 
   const [users, setUsers] = useState<DirectoryUser[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
-  const [usersError, setUsersError] = useState<string>('')
+  const [usersError, setUsersError] = useState('')
 
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([])
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
-  const [submissionsError, setSubmissionsError] = useState<string>('')
+  const [submissionsError, setSubmissionsError] = useState('')
 
+  // Session check
   useEffect(() => {
     let cancelled = false
 
     const checkSession = async () => {
-      try {
-        const { data } = await supabase.auth.getSession()
+      const { data } = await supabase.auth.getSession()
 
-        if (cancelled) return
+      if (cancelled) return
 
-        if (!data.session) {
-          router.push('/login')
-        } else {
-          setUserEmail(data.session.user.email || 'User')
-          setCurrentUserId(data.session.user.id)
-          setLoading(false)
-        }
-      } catch (err) {
-        console.error('Error checking session:', err)
-        if (!cancelled) {
-          router.push('/login')
-        }
+      if (!data.session) {
+        router.push('/login')
+      } else {
+        setUserEmail(data.session.user.email || 'User')
+        setCurrentUserId(data.session.user.id)
+        setLoading(false)
       }
     }
 
@@ -108,6 +104,7 @@ export default function DashboardPage() {
     }
   }, [router])
 
+  // Fetch available reviewers
   useEffect(() => {
     if (!currentUserId) return
 
@@ -117,30 +114,20 @@ export default function DashboardPage() {
       setUsersLoading(true)
       setUsersError('')
 
-      try {
-        const { data, error } = await supabase
-          .from('user_directory')
-          .select('user_id, display_name')
-          .neq('user_id', currentUserId)
+      const { data, error } = await supabase
+        .from('user_directory')
+        .select('user_id, display_name')
+        .neq('user_id', currentUserId)
 
-        if (cancelled) return
+      if (cancelled) return
 
-        if (error) {
-          setUsersError(`Failed to load users: ${error.message}`)
-          console.error('Error fetching users:', error)
-        } else {
-          setUsers((data || []) as DirectoryUser[])
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setUsersError(`Failed to load users: ${String(err)}`)
-          console.error('Error fetching users:', err)
-        }
-      } finally {
-        if (!cancelled) {
-          setUsersLoading(false)
-        }
+      if (error) {
+        setUsersError(error.message)
+      } else {
+        setUsers(data || [])
       }
+
+      setUsersLoading(false)
     }
 
     fetchUsers()
@@ -150,6 +137,7 @@ export default function DashboardPage() {
     }
   }, [currentUserId])
 
+  // Fetch my submissions
   useEffect(() => {
     if (!currentUserId) return
 
@@ -159,40 +147,30 @@ export default function DashboardPage() {
       setSubmissionsLoading(true)
       setSubmissionsError('')
 
-      try {
-        const { data, error } = await supabase
-          .from('submissions')
-          .select(`
-            id,
-            assignment_id,
-            language,
-            created_at,
-            code_text,
-            author_id,
-            assignments (id, title),
-            user_profiles!submissions_author_id_fkey (display_name)
-          `)
-          .eq('author_id', currentUserId)
-          .order('created_at', { ascending: false })
+      const { data, error } = await supabase
+        .from('submissions')
+        .select(`
+          id,
+          assignment_id,
+          language,
+          created_at,
+          code_text,
+          author_id,
+          assignments (id, title),
+          user_profiles!submissions_author_id_fkey (display_name)
+        `)
+        .eq('author_id', currentUserId)
+        .order('created_at', { ascending: false })
 
-        if (cancelled) return
+      if (cancelled) return
 
-        if (error) {
-          setSubmissionsError(`Failed to load submissions: ${error.message}`)
-          console.error('Error fetching submissions:', error)
-        } else {
-          setSubmissions((data || []) as SubmissionRow[])
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setSubmissionsError(`Failed to load submissions: ${String(err)}`)
-          console.error('Error fetching submissions:', err)
-        }
-      } finally {
-        if (!cancelled) {
-          setSubmissionsLoading(false)
-        }
+      if (error) {
+        setSubmissionsError(error.message)
+      } else {
+        setSubmissions((data || []) as SubmissionRow[])
       }
+
+      setSubmissionsLoading(false)
     }
 
     fetchSubmissions()
@@ -203,12 +181,8 @@ export default function DashboardPage() {
   }, [currentUserId])
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut()
-      router.push('/login')
-    } catch (err) {
-      console.error('Error logging out:', err)
-    }
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
   if (loading) {
@@ -228,9 +202,6 @@ export default function DashboardPage() {
           <div>
             <h1 className="dashboard-title">Dashboard</h1>
             <p className="dashboard-welcome">Welcome back, {userEmail}</p>
-            {process.env.NODE_ENV === 'development' && (
-              <p style={{ fontSize: '12px', color: '#666' }}>User ID: {currentUserId}</p>
-            )}
           </div>
           <button onClick={handleLogout} className="btn btn-secondary">
             Log out
@@ -248,24 +219,15 @@ export default function DashboardPage() {
 
         <div className="dashboard-layout">
           <div className="dashboard-grid">
-            {/* My Assignments */}
+            {/* My Assignments (mock for MVP) */}
             <section className="dashboard-section">
               <h2 className="section-title">My Assignments</h2>
               <div className="section-content">
                 {mockAssignments.map((assignment) => (
                   <div key={assignment.id} className="dashboard-card">
                     <h3 className="card-title">{assignment.title}</h3>
-                    <div className="card-details">
-                      <p>
-                        <strong>Submit Due:</strong> {assignment.submitDue}
-                      </p>
-                      <p>
-                        <strong>Review Due:</strong> {assignment.reviewDue}
-                      </p>
-                    </div>
-                    <Link href={`/assignments/${assignment.id}`} className="btn btn-primary btn-small">
-                      View
-                    </Link>
+                    <p><strong>Submit Due:</strong> {assignment.submitDue}</p>
+                    <p><strong>Review Due:</strong> {assignment.reviewDue}</p>
                   </div>
                 ))}
               </div>
@@ -278,57 +240,34 @@ export default function DashboardPage() {
                 {reviewsLoading ? (
                   <p>Loading reviews...</p>
                 ) : reviewsError ? (
-                  <div className="error-state">
-                    <p className="error-message">Error: {reviewsError}</p>
-                  </div>
+                  <p>Error: {reviewsError}</p>
                 ) : reviewAssignments.length === 0 ? (
                   <p>No reviews assigned yet.</p>
                 ) : (
                   reviewAssignments.map((review) => (
                     <div key={review.id} className="dashboard-card">
-                      <h3 className="card-title">{review.assignment_title}</h3>
-                      <div className="card-details">
-                        <p>
-                          <strong>Author:</strong> {review.author_display_name}
-                        </p>
-                        <p>
-                          <strong>Language:</strong> {review.language}
-                        </p>
-                        <p>
-                          <strong>Status:</strong>{' '}
-                          <span className={`status-badge status-${review.status.toLowerCase()}`}>
-                            {review.status}
-                          </span>
-                        </p>
-                        <p>
-                          <strong>Assigned:</strong>{' '}
-                          {new Date(review.assigned_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Link 
-                        href={`/reviews/${review.id}`} 
-                        className="btn btn-primary btn-small"
-                      >
-                        Review Code
-                      </Link>
+                      <h3>{review.assignment_title}</h3>
+                      <p><strong>Author:</strong> {review.author_display_name}</p>
+                      <p><strong>Language:</strong> {review.language}</p>
+                      <p><strong>Status:</strong> {review.status}</p>
+                      <p>
+                        <strong>Assigned:</strong>{' '}
+                        {new Date(review.assigned_at).toLocaleDateString()}
+                      </p>
                     </div>
                   ))
                 )}
               </div>
             </section>
 
-            {/* Recent Activity */}
+            {/* Recent Activity (mock) */}
             <section className="dashboard-section">
               <h2 className="section-title">Recent Activity</h2>
-              <div className="section-content">
-                <ul className="activity-list">
-                  {mockActivities.map((activity, index) => (
-                    <li key={index} className="activity-item">
-                      {activity}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <ul className="activity-list">
+                {mockActivities.map((activity, i) => (
+                  <li key={i}>{activity}</li>
+                ))}
+              </ul>
             </section>
 
             {/* My Submissions */}
@@ -336,20 +275,21 @@ export default function DashboardPage() {
               <h2 className="section-title">My Submissions</h2>
               <div className="section-content">
                 {submissionsLoading ? (
-                  <div className="dashboard-loading">Loading...</div>
+                  <p>Loading...</p>
                 ) : submissionsError ? (
-                  <div className="dashboard-error">{submissionsError}</div>
+                  <p>{submissionsError}</p>
                 ) : submissions.length === 0 ? (
-                  <p className="empty-state">No submissions yet</p>
+                  <p>No submissions yet</p>
                 ) : (
                   <ul className="activity-list">
                     {submissions.map((submission) => (
-                      <li key={submission.id} className="activity-item">
-                        <strong>Assignment:</strong> {submission.assignments?.title || 'Unknown'} |{' '}
-                        <strong>Author:</strong> {submission.user_profiles?.display_name || 'Unknown'} |{' '}
-                        <strong>Language:</strong> {submission.language} | <strong>Created:</strong>{' '}
-                        {new Date(submission.created_at).toLocaleDateString()} | <strong>Code length:</strong>{' '}
-                        {submission.code_text.length} chars
+                      <li key={submission.id}>
+                        <strong>Assignment:</strong>{' '}
+                        {submission.assignments?.[0]?.title ?? 'Unknown'} |{' '}
+                        <strong>Language:</strong> {submission.language} |{' '}
+                        <strong>Created:</strong>{' '}
+                        {new Date(submission.created_at).toLocaleDateString()} |{' '}
+                        <strong>Code length:</strong> {submission.code_text.length}
                       </li>
                     ))}
                   </ul>
@@ -358,25 +298,21 @@ export default function DashboardPage() {
             </section>
           </div>
 
-          {/* Available Reviewers Sidebar */}
+          {/* Sidebar */}
           <aside className="dashboard-sidebar">
             <section className="dashboard-section">
               <h2 className="section-title">Available Reviewers</h2>
               <div className="section-content">
                 {usersLoading ? (
-                  <div className="dashboard-loading">Loading...</div>
+                  <p>Loading...</p>
                 ) : usersError ? (
-                  <div className="dashboard-error">{usersError}</div>
+                  <p>{usersError}</p>
                 ) : users.length === 0 ? (
-                  <p className="empty-state">No users available</p>
+                  <p>No users available</p>
                 ) : (
-                  <ul className="user-list">
+                  <ul>
                     {users.map((user) => (
-                      <li key={user.user_id} className="user-item">
-                        <div className="user-card">
-                          <span className="user-name">{user.display_name}</span>
-                        </div>
-                      </li>
+                      <li key={user.user_id}>{user.display_name}</li>
                     ))}
                   </ul>
                 )}
