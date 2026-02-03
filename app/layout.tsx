@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import '../styles/globals.css';
 
 export const metadata: Metadata = {
-  title: 'Peer Code Review & Feedback Platform',
+  title: 'Team Green’s Code Review Platform',
   description: 'A platform for students to practice structured peer code review.',
 };
 

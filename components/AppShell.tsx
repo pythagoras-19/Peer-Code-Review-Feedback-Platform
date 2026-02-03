@@ -12,7 +12,7 @@ export default function AppShell({ children }: AppShellProps) {
       <header className="app-header">
         <div className="header-content">
           <img src="/unt_logo.png" alt="UNT Logo" className="logo-image" />
-          <h2 className="logo">CodeReview</h2>
+          <h2 className="logo">Team Green’s Code Review Platform</h2>
         </div>
       </header>
       <main className="app-main">
