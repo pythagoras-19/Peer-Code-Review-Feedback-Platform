@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AppShell from '@/components/AppShell'
 import { supabase } from '@/lib/supabaseClient'
+import { useReviewAssignments } from '@/lib/hooks/useReviewAssignments'
 
 // Mock data
 const mockAssignments = [
@@ -28,24 +29,6 @@ const mockAssignments = [
   }
 ]
 
-const mockReviews = [
-  {
-    id: 1,
-    assignmentTitle: 'Binary Search Tree Implementation',
-    status: 'ASSIGNED'
-  },
-  {
-    id: 2,
-    assignmentTitle: 'Algorithm Optimization',
-    status: 'DRAFT'
-  },
-  {
-    id: 3,
-    assignmentTitle: 'Code Refactoring Challenge',
-    status: 'SUBMITTED'
-  }
-]
-
 const mockActivities = [
   'You submitted "Binary Search Tree Implementation"',
   'You received 2 reviews on "REST API Design"',
@@ -58,6 +41,15 @@ type DirectoryUser = {
   display_name: string
 }
 
+type Assignment = {
+  id: string
+  title: string
+}
+
+type Author = {
+  display_name: string
+}
+
 type SubmissionRow = {
   id: string
   assignment_id: string
@@ -65,6 +57,8 @@ type SubmissionRow = {
   language: string
   created_at: string
   code_text: string
+  assignments: Assignment | null
+  user_profiles: Author | null
 }
 
 export default function DashboardPage() {
@@ -72,6 +66,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState<string>('')
   const [currentUserId, setCurrentUserId] = useState<string>('')
+
+  const { reviewAssignments, loading: reviewsLoading, error: reviewsError } = useReviewAssignments()
 
   const [users, setUsers] = useState<DirectoryUser[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
@@ -166,7 +162,16 @@ export default function DashboardPage() {
       try {
         const { data, error } = await supabase
           .from('submissions')
-          .select('id, assignment_id, language, created_at, code_text, author_id')
+          .select(`
+            id,
+            assignment_id,
+            language,
+            created_at,
+            code_text,
+            author_id,
+            assignments (id, title),
+            user_profiles!submissions_author_id_fkey (display_name)
+          `)
           .eq('author_id', currentUserId)
           .order('created_at', { ascending: false })
 
@@ -270,22 +275,45 @@ export default function DashboardPage() {
             <section className="dashboard-section">
               <h2 className="section-title">Reviews Assigned To Me</h2>
               <div className="section-content">
-                {mockReviews.map((review) => (
-                  <div key={review.id} className="dashboard-card">
-                    <h3 className="card-title">{review.assignmentTitle}</h3>
-                    <div className="card-details">
-                      <p>
-                        <strong>Status:</strong>{' '}
-                        <span className={`status-badge status-${review.status.toLowerCase()}`}>
-                          {review.status}
-                        </span>
-                      </p>
-                    </div>
-                    <Link href={`/reviews/${review.id}`} className="btn btn-primary btn-small">
-                      Start Review
-                    </Link>
+                {reviewsLoading ? (
+                  <p>Loading reviews...</p>
+                ) : reviewsError ? (
+                  <div className="error-state">
+                    <p className="error-message">Error: {reviewsError}</p>
                   </div>
-                ))}
+                ) : reviewAssignments.length === 0 ? (
+                  <p>No reviews assigned yet.</p>
+                ) : (
+                  reviewAssignments.map((review) => (
+                    <div key={review.id} className="dashboard-card">
+                      <h3 className="card-title">{review.assignment_title}</h3>
+                      <div className="card-details">
+                        <p>
+                          <strong>Author:</strong> {review.author_display_name}
+                        </p>
+                        <p>
+                          <strong>Language:</strong> {review.language}
+                        </p>
+                        <p>
+                          <strong>Status:</strong>{' '}
+                          <span className={`status-badge status-${review.status.toLowerCase()}`}>
+                            {review.status}
+                          </span>
+                        </p>
+                        <p>
+                          <strong>Assigned:</strong>{' '}
+                          {new Date(review.assigned_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Link 
+                        href={`/reviews/${review.id}`} 
+                        className="btn btn-primary btn-small"
+                      >
+                        Review Code
+                      </Link>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
 
@@ -317,8 +345,8 @@ export default function DashboardPage() {
                   <ul className="activity-list">
                     {submissions.map((submission) => (
                       <li key={submission.id} className="activity-item">
-                        <strong>ID:</strong> {submission.id} | <strong>Assignment:</strong>{' '}
-                        {submission.assignment_id} | <strong>Author:</strong> {submission.author_id} |{' '}
+                        <strong>Assignment:</strong> {submission.assignments?.title || 'Unknown'} |{' '}
+                        <strong>Author:</strong> {submission.user_profiles?.display_name || 'Unknown'} |{' '}
                         <strong>Language:</strong> {submission.language} | <strong>Created:</strong>{' '}
                         {new Date(submission.created_at).toLocaleDateString()} | <strong>Code length:</strong>{' '}
                         {submission.code_text.length} chars

@@ -1,18 +1,25 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AppShell from '@/components/AppShell'
 import { useReviewers } from '@/lib/hooks/useReviewers'
+import { supabase } from '@/lib/supabaseClient'
 
 // New Assignment Page Component
 export default function NewAssignmentPage() {
+  const router = useRouter()
   const { reviewers, loading: loadingReviewers, error: reviewersError } = useReviewers()
   const [assignmentTitle, setAssignmentTitle] = useState('')
+  const [assignmentDescription, setAssignmentDescription] = useState('')
   const [language, setLanguage] = useState('js')
   const [codeText, setCodeText] = useState('')
+  const [notes, setNotes] = useState('')
   const [showReviewerSelection, setShowReviewerSelection] = useState(false)
   const [selectedReviewers, setSelectedReviewers] = useState<Set<string>>(new Set())
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   // Toggle reviewer selection
   const handleToggleReviewer = (userId: string) => {
@@ -24,18 +31,81 @@ export default function NewAssignmentPage() {
     }
     setSelectedReviewers(newSelected)
   }
-    // Confirm assignment submission
-  const handleConfirmAssignments = () => {
-    const reviewerIds = Array.from(selectedReviewers)
-    console.log('Assignment submission:', {
-      title: assignmentTitle,
-      language,
-      code: codeText,
-      reviewers: reviewerIds,
-    })
-    alert(
-      `Assignment submitted!\nTitle: ${assignmentTitle}\nReviewers assigned: ${reviewerIds.length}`
-    )
+
+  // Confirm assignment submission
+  const handleConfirmAssignments = async () => {
+    if (selectedReviewers.size === 0) {
+      alert('Please select at least one reviewer')
+      return
+    }
+
+    if (!assignmentTitle.trim()) {
+      alert('Please enter an assignment title')
+      return
+    }
+
+    if (!codeText.trim()) {
+      alert('Please enter your code')
+      return
+    }
+
+    setIsSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      // Step 1: Create the assignment
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from('assignments')
+        .insert({
+          title: assignmentTitle,
+          description: assignmentDescription || 'No description provided',
+          reviews_required: selectedReviewers.size,
+        })
+        .select('id')
+        .single()
+
+      if (assignmentError) {
+        const errorDetail = assignmentError.code
+          ? `${assignmentError.code}: ${assignmentError.message}`
+          : assignmentError.message
+        throw new Error(`Failed to create assignment: ${errorDetail}`)
+      }
+
+      const assignmentId = assignmentData.id
+
+      // Step 2: Create submission and assign reviewers via RPC
+      const reviewerIds = Array.from(selectedReviewers)
+      const { data: submissionId, error: rpcError } = await supabase.rpc(
+        'create_submission_and_assign_reviewers',
+        {
+          p_assignment_id: assignmentId,
+          p_language: language,
+          p_code_text: codeText,
+          p_notes: notes || null,
+          p_reviewer_ids: reviewerIds,
+        }
+      )
+
+      if (rpcError) {
+        const errorDetail = rpcError.code
+          ? `${rpcError.code}: ${rpcError.message}`
+          : rpcError.message
+        throw new Error(`Failed to create submission: ${errorDetail}`)
+      }
+
+      // Success! Redirect to dashboard
+      alert(
+        `Assignment submitted successfully!\nTitle: ${assignmentTitle}\nReviewers assigned: ${reviewerIds.length}\nSubmission ID: ${submissionId}`
+      )
+      router.push('/dashboard')
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred'
+      console.error('Error submitting assignment:', errorMessage)
+      setSubmitError(errorMessage)
+      alert(`Error: ${errorMessage}`)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   // Render the New Assignment Page
@@ -61,6 +131,21 @@ export default function NewAssignmentPage() {
                   onChange={(e) => setAssignmentTitle(e.target.value)}
                   placeholder="e.g., Binary Search Tree Implementation"
                   className="form-input"
+                  required
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="description" className="form-label">
+                  Description (Optional)
+                </label>
+                <textarea
+                  id="description"
+                  value={assignmentDescription}
+                  onChange={(e) => setAssignmentDescription(e.target.value)}
+                  placeholder="Brief description of the assignment..."
+                  className="form-textarea"
+                  rows={3}
                 />
               </div>
 
@@ -93,6 +178,21 @@ export default function NewAssignmentPage() {
                   placeholder="Paste your code here..."
                   className="form-textarea"
                   rows={12}
+                  required
+                />
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="notes" className="form-label">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  id="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Any additional notes for reviewers..."
+                  className="form-textarea"
+                  rows={3}
                 />
               </div>
 
@@ -100,11 +200,18 @@ export default function NewAssignmentPage() {
                 <button
                   onClick={() => setShowReviewerSelection(true)}
                   className="btn btn-primary"
+                  disabled={!assignmentTitle.trim() || !codeText.trim()}
                 >
                   Assign Reviewers
                 </button>
               ) : (
                 <>
+                  {submitError && (
+                    <div className="error-state">
+                      <p className="error-message">Error: {submitError}</p>
+                    </div>
+                  )}
+                  
                   <div className="reviewer-selection">
                     <h3 className="reviewer-title">Select Reviewers</h3>
                     <p className="reviewer-count">
@@ -140,6 +247,7 @@ export default function NewAssignmentPage() {
                                 ? 'reviewer-button-selected'
                                 : ''
                             }`}
+                            disabled={isSubmitting}
                           >
                             {reviewer.display_name}
                           </button>
@@ -151,15 +259,16 @@ export default function NewAssignmentPage() {
                       <button
                         onClick={() => setShowReviewerSelection(false)}
                         className="btn btn-secondary"
+                        disabled={isSubmitting}
                       >
                         Back
                       </button>
                       <button
                         onClick={handleConfirmAssignments}
                         className="btn btn-primary"
-                        disabled={selectedReviewers.size === 0 || loadingReviewers}
+                        disabled={selectedReviewers.size === 0 || loadingReviewers || isSubmitting}
                       >
-                        Confirm Assignments
+                        {isSubmitting ? 'Submitting...' : 'Confirm Assignments'}
                       </button>
                     </div>
                   </div>
