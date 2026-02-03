@@ -3,23 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import AppShell from '@/components/AppShell'
-
-interface Reviewer {
-  user_id: string
-  display_name: string
-}
-
-// Mock reviewers - in a real app, fetch from the database
-const mockReviewers: Reviewer[] = [
-  { user_id: '1', display_name: 'mattdchr' },
-  { user_id: '2', display_name: 'alexjohn' },
-  { user_id: '3', display_name: 'sarahlee' },
-  { user_id: '4', display_name: 'markwong' },
-  { user_id: '5', display_name: 'jessxyz' },
-]
+import { useReviewers } from '@/lib/hooks/useReviewers'
 
 // New Assignment Page Component
 export default function NewAssignmentPage() {
+  const { reviewers, loading: loadingReviewers, error: reviewersError } = useReviewers()
   const [assignmentTitle, setAssignmentTitle] = useState('')
   const [language, setLanguage] = useState('js')
   const [codeText, setCodeText] = useState('')
@@ -122,21 +110,43 @@ export default function NewAssignmentPage() {
                     <p className="reviewer-count">
                       Selected: {selectedReviewers.size} reviewer(s)
                     </p>
-                    <div className="reviewer-list">
-                      {mockReviewers.map((reviewer) => (
+
+                    {loadingReviewers ? (
+                      <div className="loading-state">
+                        <p>Loading available reviewers...</p>
+                      </div>
+                    ) : reviewersError ? (
+                      <div className="error-state">
+                        <p className="error-message">Error: {reviewersError}</p>
                         <button
-                          key={reviewer.user_id}
-                          onClick={() => handleToggleReviewer(reviewer.user_id)}
-                          className={`reviewer-button ${
-                            selectedReviewers.has(reviewer.user_id)
-                              ? 'reviewer-button-selected'
-                              : ''
-                          }`}
+                          onClick={() => window.location.reload()}
+                          className="btn btn-secondary"
                         >
-                          {reviewer.display_name}
+                          Retry
                         </button>
-                      ))}
-                    </div>
+                      </div>
+                    ) : reviewers.length === 0 ? (
+                      <div className="empty-state">
+                        <p>No other users available for review assignment.</p>
+                      </div>
+                    ) : (
+                      <div className="reviewer-list">
+                        {reviewers.map((reviewer) => (
+                          <button
+                            key={reviewer.user_id}
+                            onClick={() => handleToggleReviewer(reviewer.user_id)}
+                            className={`reviewer-button ${
+                              selectedReviewers.has(reviewer.user_id)
+                                ? 'reviewer-button-selected'
+                                : ''
+                            }`}
+                          >
+                            {reviewer.display_name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="reviewer-actions">
                       <button
                         onClick={() => setShowReviewerSelection(false)}
@@ -147,7 +157,7 @@ export default function NewAssignmentPage() {
                       <button
                         onClick={handleConfirmAssignments}
                         className="btn btn-primary"
-                        disabled={selectedReviewers.size === 0}
+                        disabled={selectedReviewers.size === 0 || loadingReviewers}
                       >
                         Confirm Assignments
                       </button>
