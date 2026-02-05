@@ -7,28 +7,6 @@ import AppShell from '@/components/AppShell'
 import { supabase } from '@/lib/supabaseClient'
 import { useReviewAssignments } from '@/lib/hooks/useReviewAssignments'
 
-// Mock data (MVP only)
-const mockAssignments = [
-  {
-    id: 1,
-    title: 'Binary Search Tree Implementation',
-    submitDue: 'Jan 20, 2026',
-    reviewDue: 'Jan 25, 2026'
-  },
-  {
-    id: 2,
-    title: 'REST API Design',
-    submitDue: 'Jan 28, 2026',
-    reviewDue: 'Feb 2, 2026'
-  },
-  {
-    id: 3,
-    title: 'Database Normalization Exercise',
-    submitDue: 'Feb 5, 2026',
-    reviewDue: 'Feb 10, 2026'
-  }
-]
-
 const mockActivities = [
   'You submitted "Binary Search Tree Implementation"',
   'You received 2 reviews on "REST API Design"',
@@ -44,6 +22,16 @@ type DirectoryUser = {
 type Assignment = {
   id: string
   title: string
+}
+
+type MyAssignment = {
+  id: string
+  title: string
+  description: string
+  submit_due: string
+  review_due: string
+  reviews_required: number
+  created_at: string
 }
 
 type Author = {
@@ -78,6 +66,10 @@ export default function DashboardPage() {
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([])
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
   const [submissionsError, setSubmissionsError] = useState('')
+
+  const [assignments, setAssignments] = useState<MyAssignment[]>([])
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false)
+  const [assignmentsError, setAssignmentsError] = useState('')
 
   // Session check
   useEffect(() => {
@@ -180,6 +172,41 @@ export default function DashboardPage() {
     }
   }, [currentUserId])
 
+  // Fetch my assignments
+  useEffect(() => {
+    if (!currentUserId) return
+
+    let cancelled = false
+
+    const fetchAssignments = async () => {
+      setAssignmentsLoading(true)
+      setAssignmentsError('')
+
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('id,title,description,submit_due,review_due,reviews_required,created_at')
+        .eq('created_by', currentUserId)
+        .order('created_at', { ascending: false })
+
+      if (cancelled) return
+
+      if (error) {
+        console.log('Error loading assignments:', error)
+        setAssignmentsError(error.message)
+      } else {
+        setAssignments((data || []) as MyAssignment[])
+      }
+
+      setAssignmentsLoading(false)
+    }
+
+    fetchAssignments()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentUserId])
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -226,13 +253,43 @@ export default function DashboardPage() {
             <section className="dashboard-section">
               <h2 className="section-title">My Assignments</h2>
               <div className="section-content">
-                {mockAssignments.map((assignment) => (
-                  <div key={assignment.id} className="dashboard-card">
-                    <h3 className="card-title">{assignment.title}</h3>
-                    <p><strong>Submit Due:</strong> {assignment.submitDue}</p>
-                    <p><strong>Review Due:</strong> {assignment.reviewDue}</p>
-                  </div>
-                ))}
+                {assignmentsLoading ? (
+                  <p>Loading assignments...</p>
+                ) : assignmentsError ? (
+                  <p>Error: {assignmentsError}</p>
+                ) : assignments.length === 0 ? (
+                  <p>No assignments yet. Create one to get started.</p>
+                ) : (
+                  assignments.map((assignment) => {
+                    const description = assignment.description?.trim()
+                    const shortDescription = description
+                      ? description.length > 140
+                        ? `${description.slice(0, 140)}...`
+                        : description
+                      : ''
+
+                    return (
+                      <div key={assignment.id} className="dashboard-card">
+                        <h3 className="card-title">{assignment.title}</h3>
+                        {shortDescription && (
+                          <p className="card-details">{shortDescription}</p>
+                        )}
+                        <p>
+                          <strong>Submit Due:</strong>{' '}
+                          {new Date(assignment.submit_due).toLocaleDateString()}
+                        </p>
+                        <p>
+                          <strong>Review Due:</strong>{' '}
+                          {new Date(assignment.review_due).toLocaleDateString()}
+                        </p>
+                        <p>
+                          <strong>Reviews Required:</strong>{' '}
+                          {assignment.reviews_required}
+                        </p>
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </section>
 
