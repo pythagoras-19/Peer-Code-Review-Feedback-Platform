@@ -236,7 +236,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="dashboard-actions">
-          <Link href="/assignments/create" className="btn btn-secondary">
+          <Link href="/assignments/create" className="btn btn-primary">
             Create Assignment
           </Link>
           <Link href="/assignments/new" className="btn btn-primary">
@@ -244,6 +244,9 @@ export default function DashboardPage() {
           </Link>
           <Link href="/reviews" className="btn btn-primary">
             Review Assigned Code
+          </Link>
+          <Link href="/reviews/mine" className="btn btn-primary">
+            Read My Reviews
           </Link>
         </div>
 
