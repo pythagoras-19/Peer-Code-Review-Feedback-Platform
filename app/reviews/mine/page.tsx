@@ -25,7 +25,7 @@ type SubmissionRow = {
   assignment: {
     id: string
     title: string
-  } | null
+  }[] | null
   review_assignments: ReviewAssignmentRow[] | null
 }
 
@@ -105,7 +105,23 @@ export default function MySubmissionReviewsPage() {
         console.log('Error loading reviews:', fetchError)
         setError(fetchError.message)
       } else {
-        setSubmissions((data || []) as SubmissionRow[])
+        const mapped = (data || []).map((row) => {
+          const assignmentArray = Array.isArray(row.assignment)
+            ? row.assignment
+            : row.assignment
+              ? [row.assignment]
+              : null
+
+          return {
+            id: row.id,
+            language: row.language,
+            created_at: row.created_at,
+            assignment: assignmentArray,
+            review_assignments: row.review_assignments ?? null,
+          }
+        })
+
+        setSubmissions(mapped)
       }
 
       setIsFetching(false)
@@ -130,7 +146,7 @@ export default function MySubmissionReviewsPage() {
             reviewCreatedAt: review.created_at,
             reviewStatus: assignment.status,
             reviewerId: assignment.reviewer_id,
-            assignmentTitle: submission.assignment?.title ?? 'Unknown Assignment',
+            assignmentTitle: submission.assignment?.[0]?.title ?? 'Unknown Assignment',
             submissionLanguage: submission.language,
           })
         })
