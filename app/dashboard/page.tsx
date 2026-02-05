@@ -209,6 +209,9 @@ export default function DashboardPage() {
         </div>
 
         <div className="dashboard-actions">
+          <Link href="/assignments/create" className="btn btn-secondary">
+            Create Assignment
+          </Link>
           <Link href="/assignments/new" className="btn btn-primary">
             Start Assignment
           </Link>
