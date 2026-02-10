@@ -39,7 +39,8 @@ type SubmissionRow = {
   language: string
   created_at: string
   code_text: string
-  assignment: Assignment | null
+  // Supabase embeds may come back as an object OR an array depending on relationship inference
+  assignment?: Assignment | Assignment[] | null
 }
 
 type SubmissionItem = {
@@ -48,6 +49,11 @@ type SubmissionItem = {
   language: string
   createdAt: string
   codeLength: number
+}
+
+const firstOrSelf = <T,>(value: T | T[] | null | undefined) => {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 export default function DashboardPage() {
@@ -163,15 +169,21 @@ export default function DashboardPage() {
       if (error) {
         console.error(error)
         setSubmissionsError('Unable to load submissions right now.')
+        setSubmissions([])
       } else {
-        const rows = (data || []) as SubmissionRow[]
-        const items: SubmissionItem[] = rows.map((row) => ({
-          id: row.id,
-          assignmentTitle: row.assignment?.title ?? 'Unknown',
-          language: row.language,
-          createdAt: row.created_at,
-          codeLength: row.code_text?.length ?? 0,
-        }))
+        const rows = (data ?? []) as unknown as SubmissionRow[]
+        const items: SubmissionItem[] = rows.map((row) => {
+          const assignment = firstOrSelf(row.assignment)
+
+          return {
+            id: row.id,
+            assignmentTitle: assignment?.title ?? 'Unknown',
+            language: row.language,
+            createdAt: row.created_at,
+            codeLength: row.code_text?.length ?? 0,
+          }
+        })
+
         setSubmissions(items)
       }
 
@@ -207,7 +219,7 @@ export default function DashboardPage() {
         console.log('Error loading assignments:', error)
         setAssignmentsError(error.message)
       } else {
-        setAssignments((data || []) as MyAssignment[])
+        setAssignments((data ?? []) as MyAssignment[])
       }
 
       setAssignmentsLoading(false)
@@ -265,7 +277,7 @@ export default function DashboardPage() {
 
         <div className="dashboard-layout">
           <div className="dashboard-grid">
-            {/* My Assignments (mock for MVP) */}
+            {/* My Assignments */}
             <section className="dashboard-section">
               <h2 className="section-title">My Assignments</h2>
               <div className="section-content">
