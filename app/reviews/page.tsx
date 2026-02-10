@@ -16,26 +16,36 @@ interface ReviewAssignmentRow {
   authorName: string
 }
 
+type AssignmentEmbed = {
+  id: string
+  title: string
+  review_due: string | null
+}
+
+type SubmissionEmbed = {
+  id: string
+  author_id: string | null
+  language: string
+  created_at: string
+  assignment?: AssignmentEmbed | AssignmentEmbed[] | null
+  assignments?: AssignmentEmbed | AssignmentEmbed[] | null
+}
+
 type ReviewAssignmentsQueryRow = {
   id: string
   status: string | null
   assigned_at: string
-  submission: {
-    id: string
-    author_id: string | null
-    language: string
-    created_at: string
-    assignment?: {
-      id: string
-      title: string
-      review_due: string
-    } | null
-    assignments?: {
-      id: string
-      title: string
-      review_due: string
-    } | null
-  } | null
+  submission?: SubmissionEmbed | SubmissionEmbed[] | null
+}
+
+const firstOrSelf = <T,>(value: T | T[] | null | undefined) => {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
+}
+
+const normalizeStatus = (value: string | null | undefined) => {
+  const raw = value ?? 'assigned'
+  return raw.replace(/'/g, '').trim().toLowerCase()
 }
 
 export default function ReviewsPage() {
@@ -47,12 +57,12 @@ export default function ReviewsPage() {
   useEffect(() => {
     let isActive = true
 
-    const safeSetState = (fn: () => void) => {
+    const safeSet = (fn: () => void) => {
       if (isActive) fn()
     }
 
     const loadReviews = async () => {
-      safeSetState(() => {
+      safeSet(() => {
         setLoading(true)
         setErrorMessage(null)
       })
@@ -64,32 +74,34 @@ export default function ReviewsPage() {
         return
       }
 
+      // IMPORTANT for me:
+      // Use explicit FK embedding so PostgREST returns single objects instead of arrays
+      // review_assignments.submission_id -> submissions.id is review_assignments_submission_id_fkey
+      // submissions.assignment_id -> assignments.id is submissions_assignment_id_fkey
       const { data, error } = await supabase
         .from('review_assignments')
-        .select(
-          `
+        .select(`
           id,
           status,
           assigned_at,
-          submission:submissions (
+          submission:submissions!review_assignments_submission_id_fkey (
             id,
             author_id,
             language,
             created_at,
-            assignment:assignments (
+            assignment:assignments!submissions_assignment_id_fkey (
               id,
               title,
               review_due
             )
           )
-        `
-        )
+        `)
         .eq('reviewer_id', userData.user.id)
         .order('assigned_at', { ascending: false })
 
       if (error) {
         console.error(error)
-        safeSetState(() => {
+        safeSet(() => {
           setErrorMessage('Unable to load your assigned reviews right now.')
           setReviews([])
           setLoading(false)
@@ -97,14 +109,13 @@ export default function ReviewsPage() {
         return
       }
 
-      const typed = (data ?? []) as ReviewAssignmentsQueryRow[]
+      const typed = (data ?? []) as unknown as ReviewAssignmentsQueryRow[]
 
-      // Gather unique author ids from returned submissions
       const authorIds = Array.from(
         new Set(
           typed
-            .map((row) => row.submission?.author_id)
-            .filter((authorId): authorId is string => Boolean(authorId))
+            .map((row) => firstOrSelf(row.submission)?.author_id)
+            .filter((id): id is string => Boolean(id))
         )
       )
 
@@ -120,26 +131,26 @@ export default function ReviewsPage() {
           console.error(profileError)
         } else if (profiles) {
           authorNameMap = new Map(
-            profiles.map((profile) => [profile.user_id, profile.display_name])
+            profiles.map((p) => [p.user_id, p.display_name])
           )
         }
       }
 
       const rows: ReviewAssignmentRow[] = typed.map((row) => {
-        const submission = row.submission
+        const submission = firstOrSelf(row.submission)
 
-        const embeddedAssignment =
-          submission?.assignment ?? submission?.assignments ?? null
+        const assignmentEmbed =
+          firstOrSelf(submission?.assignment) ??
+          firstOrSelf(submission?.assignments)
 
-        const assignmentTitle = embeddedAssignment?.title ?? 'Untitled Assignment'
+        const assignmentTitle = assignmentEmbed?.title ?? 'Untitled Assignment'
 
         const authorId = submission?.author_id ?? 'unknown'
         const authorName =
           authorNameMap.get(authorId) ??
           (authorId === 'unknown' ? 'unknown' : authorId.slice(0, 8))
 
-        const statusRaw = row.status ?? 'assigned'
-        const status = statusRaw.replace(/'/g, '').trim().toLowerCase()
+        const status = normalizeStatus(row.status)
 
         return {
           reviewAssignmentId: row.id,
@@ -152,7 +163,7 @@ export default function ReviewsPage() {
         }
       })
 
-      safeSetState(() => {
+      safeSet(() => {
         setReviews(rows)
         setLoading(false)
       })
