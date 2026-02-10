@@ -1,165 +1,185 @@
 'use client'
 
-import { useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useParams, useRouter } from 'next/navigation'
 import AppShell from '@/components/AppShell'
+import { supabase } from '@/lib/supabaseClient'
 
-interface ReviewSubmission {
+type AssignmentEmbed = {
   id: string
+  title: string
+  review_due: string | null
+}
+
+type SubmissionEmbed = {
+  id: string
+  language: string | null
+  code_text: string | null
+  created_at: string
+  assignment?: AssignmentEmbed | AssignmentEmbed[] | null
+}
+
+type ReviewAssignmentQueryRow = {
+  id: string
+  status: string | null
+  assigned_at: string | null
+  submission?: SubmissionEmbed | SubmissionEmbed[] | null
+}
+
+type ReviewDetails = {
   assignmentTitle: string
-  submittedBy: string
   language: string
-  code: string
-  submittedAt: string
+  status: string
+  assignedAt: string
+  codeText: string
 }
 
-const mockReviewData: Record<string, ReviewSubmission> = {
-  '1': {
-    id: '1',
-    assignmentTitle: 'Binary Search Tree Implementation',
-    submittedBy: 'mattdchr',
-    language: 'typescript',
-    code: `class TreeNode {
-  val: number
-  left: TreeNode | null
-  right: TreeNode | null
-
-  constructor(val: number) {
-    this.val = val
-    this.left = null
-    this.right = null
-  }
+const firstOrSelf = <T,>(value: T | T[] | null | undefined) => {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
-class BinarySearchTree {
-  root: TreeNode | null
-
-  constructor() {
-    this.root = null
-  }
-
-  insert(val: number): void {
-    const newNode = new TreeNode(val)
-    if (this.root === null) {
-      this.root = newNode
-      return
-    }
-    let current = this.root
-    while (true) {
-      if (val === current.val) return
-      if (val < current.val) {
-        if (current.left === null) {
-          current.left = newNode
-          return
-        }
-        current = current.left
-      } else {
-        if (current.right === null) {
-          current.right = newNode
-          return
-        }
-        current = current.right
-      }
-    }
-  }
-}`,
-    submittedAt: '2026-01-20T10:30:00Z',
-  },
-  '2': {
-    id: '2',
-    assignmentTitle: 'REST API Design',
-    submittedBy: 'alexjohn',
-    language: 'python',
-    code: `from flask import Flask, jsonify, request
-
-app = Flask(__name__)
-
-users = [
-  {'id': 1, 'name': 'Alice', 'email': 'alice@example.com'},
-  {'id': 2, 'name': 'Bob', 'email': 'bob@example.com'},
-]
-
-@app.route('/api/users', methods=['GET'])
-def get_users():
-  return jsonify(users)
-
-@app.route('/api/users/<int:user_id>', methods=['GET'])
-def get_user(user_id):
-  user = next((u for u in users if u['id'] == user_id), None)
-  if not user:
-    return jsonify({'error': 'User not found'}), 404
-  return jsonify(user)
-
-@app.route('/api/users', methods=['POST'])
-def create_user():
-  data = request.get_json()
-  new_user = {
-    'id': len(users) + 1,
-    'name': data.get('name'),
-    'email': data.get('email')
-  }
-  users.append(new_user)
-  return jsonify(new_user), 201
-
-if __name__ == '__main__':
-  app.run(debug=True)`,
-    submittedAt: '2026-01-22T14:15:00Z',
-  },
-  '3': {
-    id: '3',
-    assignmentTitle: 'Database Normalization Exercise',
-    submittedBy: 'sarahlee',
-    language: 'sql',
-    code: `CREATE TABLE users (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  first_name VARCHAR(100) NOT NULL,
-  last_name VARCHAR(100) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE posts (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL,
-  title VARCHAR(255) NOT NULL,
-  content LONGTEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE TABLE comments (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  post_id INT NOT NULL,
-  user_id INT NOT NULL,
-  content TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_posts_user_id ON posts(user_id);
-CREATE INDEX idx_comments_post_id ON comments(post_id);
-CREATE INDEX idx_comments_user_id ON comments(user_id);`,
-    submittedAt: '2026-01-25T09:45:00Z',
-  },
+const normalizeStatus = (value: string | null | undefined) => {
+  const raw = value ?? 'assigned'
+  return raw.replace(/'/g, '').trim().toLowerCase()
 }
 
 export default function ReviewPage() {
   const params = useParams()
-  const id = params?.id as string
-  const review = mockReviewData[id]
-  const [comment, setComment] = useState('')
+  const router = useRouter()
+  const reviewAssignmentId = params?.id as string
 
-  const handleSubmitReview = () => {
-    console.log('Review submitted:', {
-      reviewId: id,
-      comment,
-    })
-    alert(`Review submitted for ${review?.assignmentTitle}`)
+  const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [reviewDetails, setReviewDetails] = useState<ReviewDetails | null>(null)
+  const [notFound, setNotFound] = useState(false)
+
+  useEffect(() => {
+    let isActive = true
+
+    const safeSet = (fn: () => void) => {
+      if (isActive) fn()
+    }
+
+    const loadReview = async () => {
+      safeSet(() => {
+        setLoading(true)
+        setErrorMessage(null)
+        setNotFound(false)
+      })
+
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+
+      if (userError || !userData.user) {
+        router.push('/login')
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('review_assignments')
+        .select(`
+          id,
+          status,
+          assigned_at,
+          submission:submissions!review_assignments_submission_id_fkey (
+            id,
+            language,
+            code_text,
+            created_at,
+            assignment:assignments!submissions_assignment_id_fkey (
+              id,
+              title,
+              review_due
+            )
+          )
+        `)
+        .eq('id', reviewAssignmentId)
+        .single()
+
+      if (error) {
+        const isNotFound = error.code === 'PGRST116'
+        safeSet(() => {
+          if (isNotFound) {
+            setNotFound(true)
+          } else {
+            console.error(error)
+            setErrorMessage('Unable to load this review assignment.')
+          }
+          setReviewDetails(null)
+          setLoading(false)
+        })
+        return
+      }
+
+      const row = (data ?? null) as unknown as ReviewAssignmentQueryRow | null
+      if (!row) {
+        safeSet(() => {
+          setNotFound(true)
+          setReviewDetails(null)
+          setLoading(false)
+        })
+        return
+      }
+
+      const submission = firstOrSelf(row.submission)
+      const assignment = firstOrSelf(submission?.assignment)
+
+      safeSet(() => {
+        setReviewDetails({
+          assignmentTitle: assignment?.title ?? 'Untitled Assignment',
+          language: submission?.language ?? 'unknown',
+          status: normalizeStatus(row.status),
+          assignedAt: row.assigned_at ?? '',
+          codeText: submission?.code_text ?? '',
+        })
+        setLoading(false)
+      })
+    }
+
+    if (reviewAssignmentId) {
+      loadReview()
+    } else {
+      safeSet(() => {
+        setNotFound(true)
+        setLoading(false)
+      })
+    }
+
+    return () => {
+      isActive = false
+    }
+  }, [reviewAssignmentId, router])
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="dashboard-container">
+          <div className="dashboard-header">
+            <h1 className="dashboard-title">Loading Review...</h1>
+          </div>
+        </div>
+      </AppShell>
+    )
   }
 
-  if (!review) {
+  if (errorMessage) {
+    return (
+      <AppShell>
+        <div className="dashboard-container">
+          <div className="dashboard-header">
+            <h1 className="dashboard-title">Unable to Load Review</h1>
+          </div>
+          <p className="empty-state">{errorMessage}</p>
+          <Link href="/reviews" className="btn btn-secondary">
+            Back to Reviews
+          </Link>
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (notFound || !reviewDetails) {
     return (
       <AppShell>
         <div className="dashboard-container">
@@ -183,50 +203,34 @@ export default function ReviewPage() {
 
         <div className="dashboard-grid">
           <section className="dashboard-section">
-            <h2 className="section-title">{review.assignmentTitle}</h2>
+            <h2 className="section-title">{reviewDetails.assignmentTitle}</h2>
             <div className="section-content">
               <div className="card-details">
                 <p>
-                  <strong>Submitted by:</strong> {review.submittedBy}
+                  <strong>Language:</strong> {reviewDetails.language}
                 </p>
                 <p>
-                  <strong>Language:</strong> {review.language}
+                  <strong>Status:</strong>{' '}
+                  <span className={`status-badge status-${reviewDetails.status}`}>
+                    {reviewDetails.status.toUpperCase()}
+                  </span>
                 </p>
                 <p>
-                  <strong>Submitted at:</strong>{' '}
-                  {new Date(review.submittedAt).toLocaleString()}
+                  <strong>Assigned at:</strong>{' '}
+                  {reviewDetails.assignedAt
+                    ? new Date(reviewDetails.assignedAt).toLocaleString()
+                    : 'Unknown'}
                 </p>
               </div>
 
               <div className="form-field" style={{ marginTop: '1.5rem' }}>
                 <label className="form-label">Code Submission</label>
                 <pre className="code-preview">
-                  <code>{review.code}</code>
+                  <code>{reviewDetails.codeText}</code>
                 </pre>
               </div>
 
-              <div className="form-field" style={{ marginTop: '1.5rem' }}>
-                <label htmlFor="comment" className="form-label">
-                  Overall Comment
-                </label>
-                <textarea
-                  id="comment"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Enter your review comments here..."
-                  className="form-textarea"
-                  rows={8}
-                />
-              </div>
-
               <div className="review-actions" style={{ marginTop: '1.5rem' }}>
-                <button
-                  onClick={handleSubmitReview}
-                  className="btn btn-primary"
-                  disabled={!comment.trim()}
-                >
-                  Submit Review
-                </button>
                 <Link href="/reviews" className="btn btn-secondary">
                   Back to Reviews
                 </Link>
