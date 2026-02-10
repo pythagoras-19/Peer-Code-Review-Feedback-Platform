@@ -35,11 +35,6 @@ type ReviewDetails = {
   codeText: string
 }
 
-type ExistingReview = {
-  id: string
-  overall_comment: string
-}
-
 const firstOrSelf = <T,>(value: T | T[] | null | undefined) => {
   if (!value) return null
   return Array.isArray(value) ? value[0] ?? null : value
