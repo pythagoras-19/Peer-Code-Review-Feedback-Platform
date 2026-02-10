@@ -35,6 +35,11 @@ type ReviewDetails = {
   codeText: string
 }
 
+type ExistingReview = {
+  id: string
+  overall_comment: string
+}
+
 const firstOrSelf = <T,>(value: T | T[] | null | undefined) => {
   if (!value) return null
   return Array.isArray(value) ? value[0] ?? null : value
@@ -54,6 +59,10 @@ export default function ReviewPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [reviewDetails, setReviewDetails] = useState<ReviewDetails | null>(null)
   const [notFound, setNotFound] = useState(false)
+  const [comment, setComment] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     let isActive = true
@@ -95,6 +104,7 @@ export default function ReviewPage() {
           )
         `)
         .eq('id', reviewAssignmentId)
+        .eq('reviewer_id', userData.user.id)
         .single()
 
       if (error) {
@@ -125,6 +135,19 @@ export default function ReviewPage() {
       const submission = firstOrSelf(row.submission)
       const assignment = firstOrSelf(submission?.assignment)
 
+      const { data: existingReview, error: existingReviewError } = await supabase
+        .from('reviews')
+        .select('id, overall_comment')
+        .eq('review_assignment_id', reviewAssignmentId)
+        .maybeSingle()
+
+      if (existingReviewError) {
+        console.error(existingReviewError)
+        safeSet(() => {
+          setSaveError('Unable to load the existing review comment.')
+        })
+      }
+
       safeSet(() => {
         setReviewDetails({
           assignmentTitle: assignment?.title ?? 'Untitled Assignment',
@@ -133,6 +156,7 @@ export default function ReviewPage() {
           assignedAt: row.assigned_at ?? '',
           codeText: submission?.code_text ?? '',
         })
+        setComment(existingReview?.overall_comment ?? '')
         setLoading(false)
       })
     }
@@ -194,6 +218,60 @@ export default function ReviewPage() {
     )
   }
 
+  const handleSubmit = async () => {
+    const trimmedComment = comment.trim()
+
+    setSaveError(null)
+    setSaveSuccess(null)
+
+    if (!trimmedComment) {
+      setSaveError('Please enter an overall comment before submitting.')
+      return
+    }
+
+    setSaving(true)
+
+    const { data: userData, error: userError } = await supabase.auth.getUser()
+
+    if (userError || !userData.user) {
+      setSaving(false)
+      router.push('/login')
+      return
+    }
+
+    const { error } = await supabase
+      .from('reviews')
+      .upsert(
+        { review_assignment_id: reviewAssignmentId, overall_comment: trimmedComment },
+        { onConflict: 'review_assignment_id' }
+      )
+
+    if (error) {
+      console.error(error)
+      setSaving(false)
+      setSaveError('Unable to submit your review. Please try again.')
+      return
+    }
+
+    const { error: statusError } = await supabase
+      .from('review_assignments')
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
+      .eq('id', reviewAssignmentId)
+      .eq('reviewer_id', userData.user.id)
+
+    if (statusError) {
+      console.error(statusError)
+      setSaveError('Review saved, but status could not be updated.')
+    } else {
+      setSaveSuccess('Review submitted successfully.')
+      setReviewDetails((prev) =>
+        prev ? { ...prev, status: normalizeStatus('completed') } : prev
+      )
+    }
+
+    setSaving(false)
+  }
+
   return (
     <AppShell>
       <div className="dashboard-container">
@@ -230,7 +308,31 @@ export default function ReviewPage() {
                 </pre>
               </div>
 
+              <div className="form-field" style={{ marginTop: '1.5rem' }}>
+                <label className="form-label" htmlFor="overall-comment">
+                  Overall Comment
+                </label>
+                <textarea
+                  id="overall-comment"
+                  className="form-textarea"
+                  rows={6}
+                  value={comment}
+                  onChange={(event) => setComment(event.target.value)}
+                  placeholder="Share your overall feedback for this submission."
+                />
+                {saveError ? <p className="form-error">{saveError}</p> : null}
+                {saveSuccess ? <p className="form-success">{saveSuccess}</p> : null}
+              </div>
+
               <div className="review-actions" style={{ marginTop: '1.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSubmit}
+                  disabled={saving}
+                >
+                  {saving ? 'Submitting...' : 'Submit Review'}
+                </button>
                 <Link href="/reviews" className="btn btn-secondary">
                   Back to Reviews
                 </Link>
