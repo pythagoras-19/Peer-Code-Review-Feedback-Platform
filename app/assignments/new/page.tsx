@@ -1,18 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AppShell from '@/components/AppShell'
 import { useReviewers } from '@/lib/hooks/useReviewers'
 import { supabase } from '@/lib/supabaseClient'
 
+type Assignment = {
+  id: string
+  title: string
+  description: string | null
+  submit_due: string
+  review_due: string
+  reviews_required: number
+  created_at: string
+}
+
+type SubmissionPreview = {
+  language: string
+  created_at: string
+}
+
 // New Assignment Page Component
 export default function NewAssignmentPage() {
   const router = useRouter()
   const { reviewers, loading: loadingReviewers, error: reviewersError } = useReviewers()
-  const [assignmentTitle, setAssignmentTitle] = useState('')
-  const [assignmentDescription, setAssignmentDescription] = useState('')
   const [language, setLanguage] = useState('js')
   const [codeText, setCodeText] = useState('')
   const [notes, setNotes] = useState('')
@@ -20,6 +33,120 @@ export default function NewAssignmentPage() {
   const [selectedReviewers, setSelectedReviewers] = useState<Set<string>>(new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [assignmentsLoading, setAssignmentsLoading] = useState(true)
+  const [assignmentsError, setAssignmentsError] = useState<string | null>(null)
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState('')
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null)
+  const [submissionPreview, setSubmissionPreview] = useState<SubmissionPreview | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadAssignments = async () => {
+      setAssignmentsLoading(true)
+      setAssignmentsError(null)
+
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+
+      if (cancelled) return
+
+      if (userError) {
+        console.error(userError)
+        setAssignmentsError('Unable to load assignments. Please try again.')
+        setAssignmentsLoading(false)
+        return
+      }
+
+      if (!userData.user) {
+        router.push('/login')
+        return
+      }
+
+      setUserId(userData.user.id)
+
+      const { data, error } = await supabase
+        .from('assignments')
+        .select('id,title,description,submit_due,review_due,reviews_required,created_at')
+        .eq('created_by', userData.user.id)
+        .order('created_at', { ascending: false })
+
+      if (cancelled) return
+
+      if (error) {
+        console.error(error)
+        setAssignmentsError('Unable to load assignments. Please try again.')
+        setAssignmentsLoading(false)
+        return
+      }
+
+      const nextAssignments = data ?? []
+      setAssignments(nextAssignments)
+      setAssignmentsLoading(false)
+
+      if (nextAssignments.length > 0) {
+        setSelectedAssignmentId((current) => current || nextAssignments[0].id)
+      }
+    }
+
+    loadAssignments()
+
+    return () => {
+      cancelled = true
+    }
+  }, [router])
+
+  useEffect(() => {
+    if (!selectedAssignmentId) {
+      setSelectedAssignment(null)
+      return
+    }
+
+    const nextAssignment = assignments.find((assignment) => assignment.id === selectedAssignmentId) || null
+    setSelectedAssignment(nextAssignment)
+  }, [assignments, selectedAssignmentId])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadSubmissionPreview = async () => {
+      if (!selectedAssignmentId || !userId) {
+        setSubmissionPreview(null)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('submissions')
+        .select('language,created_at')
+        .eq('assignment_id', selectedAssignmentId)
+        .eq('author_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (cancelled) return
+
+      if (error) {
+        console.error(error)
+        setSubmissionPreview(null)
+        return
+      }
+
+      const latestSubmission = data?.[0] ?? null
+      setSubmissionPreview(latestSubmission)
+      if (latestSubmission?.language) {
+        setLanguage(latestSubmission.language)
+      } else {
+        setLanguage('js')
+      }
+    }
+
+    loadSubmissionPreview()
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAssignmentId, userId])
 
   // Toggle reviewer selection
   const handleToggleReviewer = (userId: string) => {
@@ -39,8 +166,8 @@ export default function NewAssignmentPage() {
       return
     }
 
-    if (!assignmentTitle.trim()) {
-      alert('Please enter an assignment title')
+    if (!selectedAssignmentId) {
+      alert('Please select an assignment')
       return
     }
 
@@ -53,32 +180,12 @@ export default function NewAssignmentPage() {
     setSubmitError(null)
 
     try {
-      // Step 1: Create the assignment
-      const { data: assignmentData, error: assignmentError } = await supabase
-        .from('assignments')
-        .insert({
-          title: assignmentTitle,
-          description: assignmentDescription || 'No description provided',
-          reviews_required: selectedReviewers.size,
-        })
-        .select('id')
-        .single()
-
-      if (assignmentError) {
-        const errorDetail = assignmentError.code
-          ? `${assignmentError.code}: ${assignmentError.message}`
-          : assignmentError.message
-        throw new Error(`Failed to create assignment: ${errorDetail}`)
-      }
-
-      const assignmentId = assignmentData.id
-
-      // Step 2: Create submission and assign reviewers via RPC
+      // Step 1: Create submission and assign reviewers via RPC
       const reviewerIds = Array.from(selectedReviewers)
       const { data: submissionId, error: rpcError } = await supabase.rpc(
         'create_submission_and_assign_reviewers',
         {
-          p_assignment_id: assignmentId,
+          p_assignment_id: selectedAssignmentId,
           p_language: language,
           p_code_text: codeText,
           p_notes: notes || null,
@@ -95,7 +202,7 @@ export default function NewAssignmentPage() {
 
       // Success! Redirect to dashboard
       alert(
-        `Assignment submitted successfully!\nTitle: ${assignmentTitle}\nReviewers assigned: ${reviewerIds.length}\nSubmission ID: ${submissionId}`
+        `Assignment submitted successfully!\nReviewers assigned: ${reviewerIds.length}\nSubmission ID: ${submissionId}`
       )
       router.push('/dashboard')
     } catch (err) {
@@ -121,33 +228,66 @@ export default function NewAssignmentPage() {
             <h2 className="section-title">Assignment Details</h2>
             <div className="section-content">
               <div className="form-field">
-                <label htmlFor="title" className="form-label">
-                  Assignment Title
+                <label htmlFor="assignment" className="form-label">
+                  Select Assignment
                 </label>
-                <input
-                  id="title"
-                  type="text"
-                  value={assignmentTitle}
-                  onChange={(e) => setAssignmentTitle(e.target.value)}
-                  placeholder="e.g., Binary Search Tree Implementation"
-                  className="form-input"
-                  required
-                />
+                {assignmentsLoading ? (
+                  <div className="loading-state">
+                    <p>Loading assignments...</p>
+                  </div>
+                ) : assignmentsError ? (
+                  <div className="error-state">
+                    <p className="error-message">{assignmentsError}</p>
+                  </div>
+                ) : assignments.length === 0 ? (
+                  <div className="empty-state">
+                    <p>No assignments yet. Create one first.</p>
+                  </div>
+                ) : (
+                  <select
+                    id="assignment"
+                    value={selectedAssignmentId}
+                    onChange={(e) => setSelectedAssignmentId(e.target.value)}
+                    className="form-input"
+                  >
+                    {assignments.map((assignment) => (
+                      <option key={assignment.id} value={assignment.id}>
+                        {assignment.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
-              <div className="form-field">
-                <label htmlFor="description" className="form-label">
-                  Description (Optional)
-                </label>
-                <textarea
-                  id="description"
-                  value={assignmentDescription}
-                  onChange={(e) => setAssignmentDescription(e.target.value)}
-                  placeholder="Brief description of the assignment..."
-                  className="form-textarea"
-                  rows={3}
-                />
-              </div>
+              {selectedAssignment && (
+                <div className="form-field">
+                  <div className="form-label">Selected Assignment</div>
+                  <p>
+                    <strong>Title:</strong> {selectedAssignment.title}
+                  </p>
+                  {selectedAssignment.description && (
+                    <p>
+                      <strong>Description:</strong> {selectedAssignment.description}
+                    </p>
+                  )}
+                  <p>
+                    <strong>Submit due:</strong>{' '}
+                    {new Date(selectedAssignment.submit_due).toLocaleDateString()}
+                  </p>
+                  <p>
+                    <strong>Review due:</strong>{' '}
+                    {new Date(selectedAssignment.review_due).toLocaleDateString()}
+                  </p>
+                  <p>
+                    <strong>Reviews required:</strong> {selectedAssignment.reviews_required}
+                  </p>
+                  {submissionPreview?.language && (
+                    <p>
+                      <strong>Last submitted in:</strong> {submissionPreview.language}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="form-field">
                 <label htmlFor="language" className="form-label">
@@ -200,7 +340,7 @@ export default function NewAssignmentPage() {
                 <button
                   onClick={() => setShowReviewerSelection(true)}
                   className="btn btn-primary"
-                  disabled={!assignmentTitle.trim() || !codeText.trim()}
+                  disabled={!selectedAssignmentId || !codeText.trim()}
                 >
                   Assign Reviewers
                 </button>
