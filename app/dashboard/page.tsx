@@ -34,19 +34,20 @@ type MyAssignment = {
   created_at: string
 }
 
-type Author = {
-  display_name: string
-}
-
 type SubmissionRow = {
   id: string
-  assignment_id: string
-  author_id: string
   language: string
   created_at: string
   code_text: string
-  assignments: Assignment[] | null
-  user_profiles: Author[] | null
+  assignment: Assignment | null
+}
+
+type SubmissionItem = {
+  id: string
+  assignmentTitle: string
+  language: string
+  createdAt: string
+  codeLength: number
 }
 
 export default function DashboardPage() {
@@ -63,7 +64,7 @@ export default function DashboardPage() {
   const [usersLoading, setUsersLoading] = useState(false)
   const [usersError, setUsersError] = useState('')
 
-  const [submissions, setSubmissions] = useState<SubmissionRow[]>([])
+  const [submissions, setSubmissions] = useState<SubmissionItem[]>([])
   const [submissionsLoading, setSubmissionsLoading] = useState(false)
   const [submissionsError, setSubmissionsError] = useState('')
 
@@ -76,15 +77,15 @@ export default function DashboardPage() {
     let cancelled = false
 
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession()
+      const { data, error } = await supabase.auth.getUser()
 
       if (cancelled) return
 
-      if (!data.session) {
+      if (error || !data.user) {
         router.push('/login')
       } else {
-        setUserEmail(data.session.user.email || 'User')
-        setCurrentUserId(data.session.user.id)
+        setUserEmail(data.user.email || 'User')
+        setCurrentUserId(data.user.id)
         setLoading(false)
       }
     }
@@ -141,25 +142,37 @@ export default function DashboardPage() {
 
       const { data, error } = await supabase
         .from('submissions')
-        .select(`
-          id,
-          assignment_id,
-          language,
-          created_at,
-          code_text,
-          author_id,
-          assignments (id, title),
-          user_profiles!submissions_author_id_fkey (display_name)
-        `)
+        .select(
+          `
+            id,
+            language,
+            created_at,
+            code_text,
+            assignment:assignments!submissions_assignment_id_fkey (
+              id,
+              title
+            )
+          `
+        )
         .eq('author_id', currentUserId)
         .order('created_at', { ascending: false })
+        .limit(10)
 
       if (cancelled) return
 
       if (error) {
-        setSubmissionsError(error.message)
+        console.error(error)
+        setSubmissionsError('Unable to load submissions right now.')
       } else {
-        setSubmissions((data || []) as SubmissionRow[])
+        const rows = (data || []) as SubmissionRow[]
+        const items: SubmissionItem[] = rows.map((row) => ({
+          id: row.id,
+          assignmentTitle: row.assignment?.title ?? 'Unknown',
+          language: row.language,
+          createdAt: row.created_at,
+          codeLength: row.code_text?.length ?? 0,
+        }))
+        setSubmissions(items)
       }
 
       setSubmissionsLoading(false)
@@ -338,21 +351,21 @@ export default function DashboardPage() {
               <h2 className="section-title">My Submissions</h2>
               <div className="section-content">
                 {submissionsLoading ? (
-                  <p>Loading...</p>
+                  <p>Loading submissions...</p>
                 ) : submissionsError ? (
                   <p>{submissionsError}</p>
                 ) : submissions.length === 0 ? (
-                  <p>No submissions yet</p>
+                  <p>No submissions yet.</p>
                 ) : (
                   <ul className="activity-list">
                     {submissions.map((submission) => (
                       <li key={submission.id}>
                         <strong>Assignment:</strong>{' '}
-                        {submission.assignments?.[0]?.title ?? 'Unknown'} |{' '}
+                        {submission.assignmentTitle} |{' '}
                         <strong>Language:</strong> {submission.language} |{' '}
                         <strong>Created:</strong>{' '}
-                        {new Date(submission.created_at).toLocaleDateString()} |{' '}
-                        <strong>Code length:</strong> {submission.code_text.length}
+                        {new Date(submission.createdAt).toLocaleDateString('en-US')} |{' '}
+                        <strong>Code length:</strong> {submission.codeLength}
                       </li>
                     ))}
                   </ul>
