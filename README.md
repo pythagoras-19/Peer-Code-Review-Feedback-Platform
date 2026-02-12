@@ -451,60 +451,13 @@ npm run test:coverage
 
 ---
 
-## Current Status
-
-### What's Working ✓
-
-- **Authentication Flow** - Sign up, login, logout via Supabase Auth
-- **Dashboard** - User-authenticated dashboard with welcome message
-- **User Directory** - Available peers fetched from Supabase in real-time
-- **Assignment UI** - Form to submit code with title, language, and code
-- **Reviewer Selection UI** - UI to toggle reviewers and preview selection
-- **Review List UI** - List of assigned reviews with status
-- **Code Review UI** - Interface to view submitted code and write feedback
-- **Database Tests** - RLS validation tests for user_profiles table
-- **Documentation** - DB_TESTING.md explains testing strategy
-
-### What's In Progress 🔄
-
-- Connecting assignment submission UI to Supabase (create assignments table)
-- Implementing review assignment workflow
-- Connecting review submission to database
-
-### What's Not Yet Started ❌
-
-- Scoring/rubric system
-- Review comments/threads
-- Notifications
-- Admin dashboard
-- Gradebook and analytics
-
----
-
 ## Future Work
-
-### Short Term (Next 1-2 sprints)
-
-1. **Complete CRUD for assignments** - Save/retrieve from database with RLS
-2. **Review assignment backend** - Implement assignment creation and RLS policies
-3. **Review submission backend** - Store reviews in database
-4. **Improve error handling** - Better user feedback for failed operations
-5. **Add more database tests** - Cover assignments, reviews, and review_assignments tables
 
 ### Medium Term
 
 - Rubric-based feedback (structured scoring criteria)
-- Comment threads within code (multi-level comments on specific lines)
 - Email notifications (on assignment, review completion, feedback received)
 - Real-time updates (use Supabase Realtime to push updates to connected clients)
-
-### Long Term
-
-- Mobile-friendly responsive design refinement
-- AI-assisted feedback suggestions
-- Integration with version control (GitHub, GitLab)
-- Support for diff-based code review
-- Instructors' analytics dashboard
 
 ---
 
