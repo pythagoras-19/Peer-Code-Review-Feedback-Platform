@@ -8,6 +8,57 @@ The platform emphasizes **security-first design**, using PostgreSQL Row Level Se
 
 ---
 
+## Current Implementation Status (MVP Progress)
+
+This is an MVP with a complete and operational core workflow. It currently uses a simplified student-only model:
+
+- There is only one role: Student.
+- Students create assignments.
+- Students submit code under assignments.
+- Students manually assign reviewer(s) to submissions.
+- Assigned reviewers complete reviews.
+- Submitters can view feedback received.
+
+The application is wired end-to-end to the database for the full peer-review lifecycle:
+
+1. A student creates an assignment.
+2. Students submit code under that assignment.
+3. A student assigns one or more reviewers to a submission.
+4. Reviewer assignments are persisted in the database.
+5. Reviewers can view submissions assigned to them.
+6. Reviewers can submit rubric-based reviews.
+7. Submitters can view the reviews they have received.
+
+Technical implementation status:
+
+- Supabase (PostgreSQL) is fully integrated.
+- Core tables (Assignments, Submissions, ReviewAssignments, Reviews, Rubric-related tables) are connected.
+- Row Level Security (RLS) is enabled.
+- RLS policies enforce:
+    - Students can only see their own submissions.
+    - Reviewers can only see submissions explicitly assigned to them.
+    - Students can only view reviews tied to their own submissions.
+- All core lifecycle actions persist correctly in the database.
+
+### What Is Currently Working
+
+- Assignment creation (student-driven)
+- Code submission
+- Manual reviewer assignment
+- Review submission
+- Viewing received feedback
+- Viewing assigned reviews
+- Database persistence with RLS enforcement
+
+### In Progress / Not Yet Implemented
+- Additional automated test coverage
+- UI polish and edge-case validation
+- Performance optimization
+
+The core peer-review lifecycle is now functionally operational and database-backed.
+
+---
+
 ## Motivation & Problem Statement
 
 Traditional code review workflows in educational settings often suffer from:
