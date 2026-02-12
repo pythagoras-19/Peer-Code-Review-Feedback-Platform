@@ -26,13 +26,13 @@ The application is wired end-to-end to the database for the full peer-review lif
 3. A student assigns one or more reviewers to a submission.
 4. Reviewer assignments are persisted in the database.
 5. Reviewers can view submissions assigned to them.
-6. Reviewers can submit rubric-based reviews.
+6. Reviewers can submit overall comments.
 7. Submitters can view the reviews they have received.
 
 Technical implementation status:
 
 - Supabase (PostgreSQL) is fully integrated.
-- Core tables (Assignments, Submissions, ReviewAssignments, Reviews, Rubric-related tables) are connected.
+- Core tables (Assignments, Submissions, ReviewAssignments, Reviews) are connected.
 - Row Level Security (RLS) is enabled.
 - RLS policies enforce:
     - Students can only see their own submissions.
