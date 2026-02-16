@@ -1,0 +1,16 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run core workflow DB test",
+			"type": "shell",
+			"command": "vitest",
+			"args": [
+				"tests/db/core_workflow.rls.test.ts",
+				"--environment",
+				"node"
+			],
+			"isBackground": false
+		}
+	]
+}
