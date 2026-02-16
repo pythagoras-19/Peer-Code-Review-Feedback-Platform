@@ -121,9 +121,8 @@ describe('core workflow smoke', () => {
       expect(reviewerAssignmentsError).toBeNull()
       expect(reviewerAssignments?.id).toBe(reviewAssignmentId)
 
-      const submissionEmbed = reviewerAssignments?.submission as
-        | { code_text: string; assignment?: { title: string } | null }
-        | null
+     const submissionEmbed = Array.isArray(reviewerAssignments?.submission)
+          ? reviewerAssignments?.submission?.[0] ?? null: reviewerAssignments?.submission ?? null
 
       expect(submissionEmbed).toBeTruthy()
       expect(submissionEmbed?.code_text).toBe('console.log("hello")')
