@@ -1,3 +1,9 @@
+-- Demo Summary:
+-- Defines row-level authorization for assignments, submissions, and review assignments.
+-- Authors can manage their own work; reviewers can access only assigned work.
+-- Direct INSERT into review_assignments is blocked so assignment creation flows via RPC.
+-- Includes indexes to keep policy checks and dashboard queries fast.
+--
 -- ============================================================================
 -- RLS Policies for submissions and review_assignments tables
 -- ============================================================================
@@ -83,6 +89,8 @@ DROP POLICY IF EXISTS "RPC can insert review assignments" ON review_assignments;
 -- Policy 1: BLOCK all direct INSERT operations
 -- Only the RPC function (with SECURITY DEFINER) can insert into this table
 -- This policy will never match, effectively blocking all direct inserts
+-- Plain English: the policy name includes "RPC", but for normal authenticated users
+-- this policy DENIES direct inserts; it does not grant insert rights.
 CREATE POLICY "RPC can insert review assignments"
 ON review_assignments
 FOR INSERT
@@ -98,6 +106,8 @@ USING (reviewer_id = auth.uid());
 
 -- Policy 3: Authors can SELECT review_assignments for their submissions
 -- This allows authors to see who is reviewing their work
+-- Plain English: author visibility is limited to review_assignments whose submission
+-- row has author_id = auth.uid().
 CREATE POLICY "Authors can read review assignments for their submissions"
 ON review_assignments
 FOR SELECT
@@ -270,4 +280,3 @@ ON review_assignments(submission_id);
 -- - Submission list queries (ORDER BY created_at DESC)
 -- ============================================================================
 -- ============================================================================
-

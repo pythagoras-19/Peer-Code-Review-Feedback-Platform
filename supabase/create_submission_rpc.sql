@@ -1,3 +1,9 @@
+-- Demo Summary:
+-- Provides one controlled write path for submission creation + reviewer assignment.
+-- Validates auth, reviewer list, and no self-review before writing.
+-- Runs as SECURITY DEFINER to perform protected inserts safely.
+-- Prevents partial writes by keeping the workflow in one DB operation.
+--
 -- ============================================================================
 -- RPC Function: create_submission_and_assign_reviewers
 -- ============================================================================

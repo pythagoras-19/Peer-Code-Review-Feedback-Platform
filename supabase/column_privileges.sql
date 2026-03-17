@@ -1,3 +1,9 @@
+-- Demo Summary:
+-- Enforces column-level immutability on ownership/linkage fields.
+-- Works with RLS by restricting which columns authenticated users can update.
+-- Protects against privilege escalation via foreign-key rewrites.
+-- Does not define row access; row access is handled by RLS policy files.
+--
 -- ============================================================================
 -- Column-Level Privileges for Immutability Enforcement
 -- ============================================================================

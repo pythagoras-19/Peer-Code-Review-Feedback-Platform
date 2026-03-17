@@ -1,0 +1,569 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{setspace}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{array}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  urlcolor=blue!60!black,
+  citecolor=blue!60!black
+}
+
+\lstdefinestyle{repo}{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+  keepspaces=true
+}
+
+\title{Peer Code Review \& Feedback Platform\\In-Depth Repository Write-Up}
+\author{}
+\date{\today}
+
+\begin{document}
+\onehalfspacing
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Executive Summary}
+This repository implements a full-stack peer code review platform centered on a security-first architecture. The primary design choice is to enforce authorization inside PostgreSQL through Supabase Row Level Security (RLS), rather than trusting frontend routing checks alone. The result is an application where the browser can interact directly with Supabase while still preserving strong data isolation guarantees.
+
+The current implementation is an MVP that already supports the complete core workflow:
+\begin{enumerate}[leftmargin=*]
+  \item User authentication with Supabase Auth (sign up, sign in, sign out).
+  \item Assignment creation by a student/author.
+  \item Code submission against an assignment.
+  \item Reviewer assignment for a submission.
+  \item Review completion by assigned reviewers.
+  \item Feedback retrieval by the original author.
+\end{enumerate}
+
+The repository is not a generic toy app. It contains concrete security policies, database integration tests, schema-specific SQL, and route-level UI logic that prove the workflow under realistic conditions. The database layer includes RLS policies, constraints, and an RPC function for atomic submission-plus-assignment creation. The frontend layer is intentionally thin and acts as an interface to this policy-driven backend.
+
+From an engineering perspective, the strongest property of the repo is that authorization decisions do not depend on client behavior. A user who manipulates frontend state or hand-crafts queries remains bound by RLS policies tied to \texttt{auth.uid()}. This dramatically reduces privilege-escalation risk.
+
+\section{Project Context and Product Goals}
+\subsection{Problem Statement}
+Academic and collaborative code review workflows often fail in three predictable ways:
+\begin{itemize}[leftmargin=*]
+  \item Review ownership is ambiguous (who reviews whose code).
+  \item Feedback quality and consistency are low.
+  \item Data separation is weak, making accidental leakage likely.
+\end{itemize}
+
+The platform addresses these issues by implementing explicit reviewer assignment and strong database-level access control.
+
+\subsection{Primary Product Goals}
+The core goals implied by the codebase and documentation are:
+\begin{itemize}[leftmargin=*]
+  \item Provide an end-to-end review lifecycle that users can execute without manual admin intervention.
+  \item Ensure each user sees only the rows they are authorized to see.
+  \item Support deterministic workflow transitions (assigned, completed, etc.).
+  \item Keep the stack deployable and maintainable with minimal custom backend surface area.
+\end{itemize}
+
+\subsection{Current Scope}
+The current repository model is intentionally simplified:
+\begin{itemize}[leftmargin=*]
+  \item Single operational role (student-like actor).
+  \item Manual reviewer selection (not automatic balancing).
+  \item Primarily overall-comment review payloads (no full rubric engine yet).
+\end{itemize}
+
+Despite these simplifications, the architectural patterns are production-relevant and extensible.
+
+\section{System Architecture}
+\subsection{Stack Overview}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Frontend}: Next.js 15 App Router with React 19 and TypeScript.
+  \item \textbf{Auth and Data}: Supabase Auth + PostgreSQL + RLS.
+  \item \textbf{Testing}: Vitest, Testing Library, Node-based DB integration tests.
+  \item \textbf{Styling}: Custom CSS (\texttt{styles/globals.css}).
+\end{itemize}
+
+\subsection{Architectural Shape}
+The application intentionally avoids a heavy custom REST API tier. Most interactions flow:
+\begin{center}
+\texttt{UI route/component -> Supabase JS client -> Postgres (RLS + constraints + SQL function)}
+\end{center}
+
+The repository does include server-side capabilities (\texttt{lib/supabaseServer.ts}, server action examples), but the dominant path remains direct client-to-Supabase for CRUD and query composition.
+
+\subsection{Design Rationale}
+This architecture is efficient for a security-focused MVP because:
+\begin{itemize}[leftmargin=*]
+  \item Authorization logic is centralized in SQL policies.
+  \item There are fewer duplicated permission checks in JavaScript.
+  \item Runtime behavior can be validated directly against DB policies with integration tests.
+  \item The frontend remains relatively simple and route-driven.
+\end{itemize}
+
+\section{Repository Layout and Responsibilities}
+\subsection{Top-Level Structure}
+At a high level, major directories and files have clear ownership boundaries:
+
+\begin{longtable}{>{\ttfamily}p{0.28\textwidth} p{0.66\textwidth}}
+\toprule
+Path & Responsibility \\
+\midrule
+\textnormal{\texttt{app/}} & Next.js App Router pages for user flows (home, auth, dashboard, assignment, reviews). \\
+\textnormal{\texttt{components/}} & Shared presentational wrappers and form primitives. \\
+\textnormal{\texttt{lib/}} & Supabase clients, auth wrappers, hooks, and server action utilities. \\
+\textnormal{\texttt{supabase/}} & SQL policy definitions, privilege scripts, and RPC function implementation. \\
+\textnormal{\texttt{tests/db/}} & Database integration tests validating workflow and RLS assumptions. \\
+\textnormal{\texttt{README.md}} & High-level architecture and setup documentation. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Route-Level Ownership}
+Key routes map directly to workflow states:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{/}: Landing page (\texttt{app/page.tsx}).
+  \item \texttt{/login}, \texttt{/signup}: Auth entry points.
+  \item \texttt{/dashboard}: Main authenticated aggregation screen.
+  \item \texttt{/assignments/create}: Assignment creation.
+  \item \texttt{/assignments/new}: Submission + reviewer selection.
+  \item \texttt{/reviews}: Assigned reviews list for reviewer.
+  \item \texttt{/reviews/[id]}: Single review completion screen.
+  \item \texttt{/reviews/mine}: Received feedback view for submission author.
+\end{itemize}
+
+\section{Frontend Application Flow}
+\subsection{Landing and Authentication}
+The home page is intentionally minimal and funnels users to sign up/sign in. Auth pages call functions in \texttt{lib/authService.ts}. Session checks execute on load; authenticated users are redirected to dashboard.
+
+The auth layer is straightforward but well-contained:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{signUp(email, password)}
+  \item \texttt{signIn(email, password)}
+  \item \texttt{getSession()}
+  \item \texttt{getUser()}
+  \item \texttt{signOut()}
+\end{itemize}
+The wrapper normalizes Supabase errors into a predictable shape for route components.
+
+\subsection{Dashboard as Aggregation Hub}
+\texttt{app/dashboard/page.tsx} is a multi-panel aggregator that loads:
+\begin{itemize}[leftmargin=*]
+  \item Current user identity/email.
+  \item Current user's assignments.
+  \item Current user's submissions (with assignment join).
+  \item Reviews assigned to current reviewer (via hook).
+  \item Reviewer directory entries.
+\end{itemize}
+
+From a code-organization viewpoint, the dashboard is doing a lot of asynchronous work in one component. This is acceptable for MVP speed, but in larger systems this would typically be split into route segments or data loader abstractions.
+
+\subsection{Assignment Creation}
+\texttt{app/assignments/create/page.tsx} provides a validated form for:
+\begin{itemize}[leftmargin=*]
+  \item title
+  \item description
+  \item submit due date
+  \item review due date
+  \item required review count
+\end{itemize}
+
+Validation runs client-side for UX (required fields, date ordering, integer checks), while real authorization and persistence constraints still occur in DB.
+
+\subsection{Submission and Reviewer Selection}
+\texttt{app/assignments/new/page.tsx} is one of the most important pages in the repo because it orchestrates the highest-value transaction:
+\begin{enumerate}[leftmargin=*]
+  \item Load authenticated user and owned assignments.
+  \item Select assignment.
+  \item Enter code and optional notes.
+  \item Choose reviewers from \texttt{user\_directory} excluding self.
+  \item Call RPC \texttt{create\_submission\_and\_assign\_reviewers}.
+\end{enumerate}
+
+This route contains UX safeguards (no empty code, no empty reviewer set), then delegates atomic integrity to SQL.
+
+\subsection{Reviewer Worklist and Review Page}
+\texttt{app/reviews/page.tsx} fetches review assignments where \texttt{reviewer\_id = auth user}, then joins through submission and assignment metadata for card rendering.
+
+\texttt{app/reviews/[id]/page.tsx} handles:
+\begin{itemize}[leftmargin=*]
+  \item Authorization-scoped fetch of specific review assignment.
+  \item Existing review retrieval (if any).
+  \item Upsert into \texttt{reviews} table.
+  \item Status update to \texttt{completed} in \texttt{review\_assignments}.
+\end{itemize}
+
+The route includes explicit not-found handling and clear UI feedback for save errors and success states.
+
+\subsection{Author Feedback Retrieval}
+\texttt{app/reviews/mine/page.tsx} pulls completed review payloads for submissions authored by the current user. This route demonstrates a core product promise: a submitter can see received peer feedback, but only for their own submissions.
+
+\section{Data Model and Relational Design}
+\subsection{Core Tables}
+Based on repository SQL and docs, the key tables are:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{user\_profiles}
+  \item \texttt{assignments}
+  \item \texttt{submissions}
+  \item \texttt{review\_assignments}
+  \item \texttt{reviews}
+  \item \texttt{user\_directory} (directory lookup)
+\end{itemize}
+
+\subsection{Entity Relationship Intent}
+The workflow can be summarized by ownership and assignment edges:
+\begin{itemize}[leftmargin=*]
+  \item A user creates many assignments.
+  \item An assignment has many submissions.
+  \item A submission has one author.
+  \item A submission can be assigned to many reviewers through \texttt{review\_assignments}.
+  \item A \texttt{review\_assignment} can have one associated review record (enforced uniqueness).
+\end{itemize}
+
+\subsection{Relational Integrity Patterns}
+The repository relies on several strong DB patterns:
+\begin{itemize}[leftmargin=*]
+  \item Foreign keys for ownership and relationship consistency.
+  \item Unique constraints to prevent duplicate reviewer assignment.
+  \item Immutable foreign key semantics (enforced through privilege strategy and/or triggers documented in repo materials).
+  \item Time and status fields supporting workflow state transitions.
+\end{itemize}
+
+\section{Authorization and Security Model}
+\subsection{RLS as Primary Guardrail}
+The most important security property is that row visibility and mutation permissions are enforced in SQL. The app assumes hostile clients are possible and designs accordingly.
+
+Representative policy intent from \texttt{supabase/submissions\_and\_review\_assignments\_rls.sql}:
+\begin{itemize}[leftmargin=*]
+  \item Authors can read/update their own submissions.
+  \item Reviewers can read submissions only if assigned.
+  \item Reviewers can read/update only their own review assignments.
+  \item Authors can read review assignments for their own submissions.
+  \item Direct insert into \texttt{review\_assignments} is blocked for normal clients; RPC is the intended insertion path.
+\end{itemize}
+
+\subsection{Policy Composition}
+One subtle but important detail: PostgreSQL combines multiple policies for the same action with OR semantics. This repo uses that behavior intentionally. For \texttt{submissions SELECT}, rows are visible if the user is either:
+\begin{itemize}[leftmargin=*]
+  \item the author, or
+  \item an assigned reviewer.
+\end{itemize}
+
+This provides clear least-privilege boundaries while enabling legitimate cross-user visibility only where workflow requires it.
+
+\subsection{Example Policy Shape}
+\begin{lstlisting}[style=repo,language=SQL,caption={Representative RLS pattern}]
+CREATE POLICY "Reviewers can read assigned submissions"
+ON submissions
+FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM review_assignments ra
+    WHERE ra.submission_id = submissions.id
+      AND ra.reviewer_id = auth.uid()
+  )
+);
+\end{lstlisting}
+
+\subsection{Why This Matters}
+If frontend code is compromised or a user crafts manual queries, unauthorized reads still fail because filtering occurs at database execution time. This is stronger than checking roles only in JavaScript logic.
+
+\section{Transactional RPC Design}
+\subsection{Function Purpose}
+\texttt{supabase/create\_submission\_rpc.sql} defines \texttt{create\_submission\_and\_assign\_reviewers}, a transaction-oriented RPC function that:
+\begin{enumerate}[leftmargin=*]
+  \item Validates authentication context (\texttt{auth.uid()}).
+  \item Rejects empty reviewer lists.
+  \item Rejects self-review.
+  \item Validates reviewer identities.
+  \item Inserts one submission.
+  \item Inserts many review assignments.
+  \item Returns created submission ID.
+\end{enumerate}
+
+\subsection{Atomicity Benefits}
+Without this function, client code might perform a submission insert and reviewer assignment inserts separately. If any second-stage insert fails, data enters a partial state. The RPC prevents that by treating the operation as one DB transaction boundary.
+
+\subsection{Security Definer Tradeoff}
+The function uses \texttt{SECURITY DEFINER} and explicit validation logic. This is a deliberate strategy:
+\begin{itemize}[leftmargin=*]
+  \item RLS blocks direct inserts for normal users on \texttt{review\_assignments}.
+  \item RPC can still create rows safely because it validates input and runs as trusted definer.
+\end{itemize}
+
+This pattern gives maintainers a narrow, auditable privileged path rather than many distributed permission exceptions.
+
+\section{Testing Strategy and Security Validation}
+\subsection{Test Layers in Repository}
+The repository includes:
+\begin{itemize}[leftmargin=*]
+  \item Route/component tests (Testing Library + Vitest).
+  \item Database integration tests in \texttt{tests/db/}.
+\end{itemize}
+
+The DB tests are the most security-critical part because they validate actual policy behavior against a real Supabase project, not mocks.
+
+\subsection{DB Test Infrastructure}
+\texttt{tests/db/helpers.ts} loads environment variables from \texttt{.env.test}, builds:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{adminClient} with service role key for setup/cleanup.
+  \item Per-user anon clients signed in as temporary test users.
+\end{itemize}
+
+This model allows tests to run both privileged setup actions and realistic policy-constrained queries.
+
+\subsection{Core Workflow Smoke Test}
+\texttt{tests/db/core\_workflow.rls.test.ts} executes end-to-end DB workflow:
+\begin{enumerate}[leftmargin=*]
+  \item Create author and reviewer users.
+  \item Insert assignment.
+  \item Insert submission.
+  \item Insert review assignment.
+  \item Read reviewer view via relational query.
+  \item Insert review and mark assignment completed.
+  \item Read received review path for author.
+\end{enumerate}
+
+Even though setup uses admin client for convenience, the structure maps directly to runtime entities and validates schema assumptions.
+
+\subsection{RLS-Specific Validation}
+\texttt{tests/db/user\_profiles.rls.test.ts} asserts two critical invariants:
+\begin{itemize}[leftmargin=*]
+  \item User can read own profile.
+  \item User cannot read another user's profile.
+\end{itemize}
+
+The pattern should continue for each table. The repository documentation already outlines expansion targets for assignments, submissions, review assignments, and reviews.
+
+\subsection{Testing Strengths and Gaps}
+\textbf{Strengths}
+\begin{itemize}[leftmargin=*]
+  \item Real policy execution in real DB environment.
+  \item Clean helper utilities for repeatable test user lifecycle.
+  \item Security invariants treated as first-class test concerns.
+\end{itemize}
+
+\textbf{Gaps}
+\begin{itemize}[leftmargin=*]
+  \item Need broader negative-path test coverage for every policy edge.
+  \item Need deterministic migration-state setup if schema evolves rapidly.
+  \item Need CI strategy that separates fast UI tests and slower DB policy suite.
+\end{itemize}
+
+\section{Developer Experience and Runtime Configuration}
+\subsection{Environment Model}
+The repository uses:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{.env.local} for app runtime public Supabase keys.
+  \item \texttt{.env.test} for DB test credentials including service role key.
+\end{itemize}
+
+This separation is appropriate and reduces accidental key misuse.
+
+\subsection{Script Surface}
+\texttt{package.json} includes:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{npm run dev}
+  \item \texttt{npm run build}
+  \item \texttt{npm run start}
+  \item \texttt{npm run lint}
+  \item \texttt{npm test}
+  \item \texttt{npm run test:coverage}
+\end{itemize}
+
+The script layout is standard and onboarding-friendly.
+
+\subsection{Code Style Observations}
+The codebase uses TypeScript and functional React components. Styling is centralized in CSS classes. Most pages are client components, which simplifies direct Supabase usage but can push more state handling into browser runtime.
+
+\section{Engineering Analysis: Strengths}
+\subsection{Security-Centered Data Access}
+The dominant strength is trust minimization. Permission guarantees are expressed where they are hardest to bypass: inside DB policies and constraints.
+
+\subsection{Clear Domain Mapping}
+The data model closely mirrors product language (assignment, submission, review assignment, review), making both SQL and UI flows easier to reason about.
+
+\subsection{Pragmatic MVP Scope}
+The project avoids premature complexity. It implements essential workflow states first, then leaves room for rubric expansion, analytics, and richer collaboration features.
+
+\subsection{Good Documentation Density}
+Multiple Markdown documents provide policy rationale, testing strategy, and schema context. This improves contributor ramp-up and preserves architectural intent.
+
+\section{Engineering Analysis: Risks and Technical Debt}
+\subsection{Client-Heavy Route Complexity}
+Some pages, especially dashboard and assignment submission routes, combine many concerns:
+\begin{itemize}[leftmargin=*]
+  \item session verification
+  \item multiple parallel queries
+  \item mapping embedded response shapes
+  \item local UX state and error states
+\end{itemize}
+As feature count grows, these routes can become difficult to maintain.
+
+\subsection{Embedded Join Shape Variability}
+Several files include utility patterns to normalize object-versus-array embeddings from Supabase relation selects. This is practical, but repeated normalization logic can hide schema assumptions and increase defect risk when joins evolve.
+
+\subsection{Policy Drift Risk}
+RLS-heavy systems are secure when policies match domain intent. As new features are added, policy drift is a common risk. Every schema change should be coupled with explicit tests for new and old invariants.
+
+\subsection{Documentation Scope Mismatch}
+Some docs include planned items that may lag implementation details. This is normal in active projects but should be actively curated to avoid onboarding confusion.
+
+\section{Scalability and Performance Considerations}
+\subsection{Current Scale Profile}
+Given current scope, Supabase direct queries and route-level fetching are adequate. The workload is transactional and moderate.
+
+\subsection{Indexing and Query Efficiency}
+Policy and workflow SQL include reviewer- and submission-oriented indexes in the RLS SQL file. This is important because policy expressions with \texttt{EXISTS} can degrade without proper index support.
+
+\subsection{Future Bottlenecks}
+As class size and submission volume increase, likely hotspots are:
+\begin{itemize}[leftmargin=*]
+  \item Dashboard queries joining many entities.
+  \item Reviewer assignment fan-out operations.
+  \item Review retrieval filters with nested embeddings.
+\end{itemize}
+
+Mitigations include materialized views for dashboard summaries, pagination defaults, and selective column projections.
+
+\section{Recommended Technical Roadmap}
+\subsection{Near-Term (Stabilization)}
+\begin{enumerate}[leftmargin=*]
+  \item Expand DB policy tests for all tables and negative cases.
+  \item Standardize query helpers for Supabase embedded relations.
+  \item Refactor heavy pages into smaller hooks/components with clear responsibilities.
+  \item Add migration-numbered SQL files and automated schema drift checks.
+\end{enumerate}
+
+\subsection{Mid-Term (Feature and UX Maturity)}
+\begin{enumerate}[leftmargin=*]
+  \item Add rubric-based structured review fields in \texttt{reviews}.
+  \item Add threaded comments or line-level annotations.
+  \item Add assignment and review notification mechanisms.
+  \item Add instructor/admin reporting mode with explicit role policies.
+\end{enumerate}
+
+\subsection{Long-Term (Operational Hardening)}
+\begin{enumerate}[leftmargin=*]
+  \item Add CI matrix that runs UI tests and DB policy tests in separate gates.
+  \item Add observability metrics for failed policy attempts and RPC usage.
+  \item Define SLOs for core actions (submission create, review save, dashboard load).
+  \item Add backup/restore and migration rollback playbooks.
+\end{enumerate}
+
+\section{Onboarding Guide for New Contributors}
+\subsection{Suggested Reading Order}
+To quickly understand the codebase:
+\begin{enumerate}[leftmargin=*]
+  \item \texttt{README.md}
+  \item \texttt{supabase/submissions\_and\_review\_assignments\_rls.sql}
+  \item \texttt{supabase/create\_submission\_rpc.sql}
+  \item \texttt{app/assignments/new/page.tsx}
+  \item \texttt{app/reviews/[id]/page.tsx}
+  \item \texttt{tests/db/core\_workflow.rls.test.ts}
+\end{enumerate}
+
+\subsection{First Practical Exercise}
+A practical first task for a new contributor is:
+\begin{itemize}[leftmargin=*]
+  \item Add one RLS negative test for \texttt{submissions} (unauthorized read).
+  \item Add one UI enhancement for error feedback on \texttt{/reviews/[id]}.
+  \item Confirm behavior by running DB tests and app tests.
+\end{itemize}
+This touches both security and UX with low blast radius.
+
+\section{Representative Snippets}
+\subsection{Supabase Client Initialization}
+\begin{lstlisting}[style=repo,language=JavaScript,caption={Client initialization shape}]
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+\end{lstlisting}
+
+\subsection{Review Submission Pattern}
+\begin{lstlisting}[style=repo,language=JavaScript,caption={Review upsert intent from review page}]
+await supabase
+  .from('reviews')
+  .upsert(
+    { review_assignment_id: reviewAssignmentId, overall_comment: trimmedComment },
+    { onConflict: 'review_assignment_id' }
+  )
+\end{lstlisting}
+
+\subsection{DB Test User Creation Pattern}
+\begin{lstlisting}[style=repo,language=JavaScript,caption={Simplified test-user helper pattern}]
+const { data: authData } = await adminClient.auth.admin.createUser({
+  email,
+  password: testPassword,
+  email_confirm: true
+})
+
+const client = createClient(supabaseUrl, anonKey)
+await client.auth.signInWithPassword({ email, password: testPassword })
+\end{lstlisting}
+
+\section{Conclusion}
+This repository is a strong example of a policy-driven full-stack application where data security is not an afterthought. The implementation demonstrates practical use of Supabase, RLS, and transactional SQL functions to enforce workflow rules that matter: who can see a submission, who can review it, and who can modify status or feedback.
+
+The most important success criterion is already met: the core workflow is implemented end-to-end with database-enforced authorization boundaries. The primary path forward is not architectural reinvention, but disciplined expansion:
+\begin{itemize}[leftmargin=*]
+  \item broader policy test coverage,
+  \item incremental page refactoring,
+  \item richer review data model,
+  \item and operational hardening for growth.
+\end{itemize}
+
+In short, the repository provides a credible foundation for a secure peer review platform and is positioned well for structured iteration.
+
+\appendix
+\section{Key Files Quick Index}
+\begin{longtable}{>{\ttfamily}p{0.38\textwidth} p{0.56\textwidth}}
+\toprule
+Path & Notes \\
+\midrule
+\textnormal{\texttt{app/page.tsx}} & Public landing page with login/signup entry points. \\
+\textnormal{\texttt{app/login/page.tsx}} & Login flow and session redirect checks. \\
+\textnormal{\texttt{app/signup/page.tsx}} & Signup flow and post-create UX behavior. \\
+\textnormal{\texttt{app/dashboard/page.tsx}} & Aggregated user dashboard with assignments/reviews/submissions. \\
+\textnormal{\texttt{app/assignments/create/page.tsx}} & Assignment creation form and validation. \\
+\textnormal{\texttt{app/assignments/new/page.tsx}} & Submission creation and reviewer assignment flow via RPC. \\
+\textnormal{\texttt{app/reviews/page.tsx}} & Reviewer's assigned reviews listing. \\
+\textnormal{\texttt{app/reviews/[id]/page.tsx}} & Review detail and review submission/upsert logic. \\
+\textnormal{\texttt{app/reviews/mine/page.tsx}} & Author's view of received review feedback. \\
+\textnormal{\texttt{lib/authService.ts}} & Typed auth wrapper around Supabase client methods. \\
+\textnormal{\texttt{lib/supabaseClient.ts}} & Browser Supabase client factory. \\
+\textnormal{\texttt{lib/supabaseServer.ts}} & Server-side Supabase client with cookie integration. \\
+\textnormal{\texttt{lib/hooks/useReviewers.ts}} & Hook for directory-based reviewer retrieval. \\
+\textnormal{\texttt{lib/hooks/useReviewAssignments.ts}} & Hook for reviewer assignment loading and shaping. \\
+\textnormal{\texttt{supabase/create\_submission\_rpc.sql}} & Atomic submission + reviewer assignment function. \\
+\textnormal{\texttt{supabase/submissions\_and\_review\_assignments\_rls.sql}} & Core policy definitions for submissions and review assignments. \\
+\textnormal{\texttt{supabase/user\_directory\_rls\_policy.sql}} & Directory read access policy for authenticated users. \\
+\textnormal{\texttt{tests/db/helpers.ts}} & DB test infrastructure, user creation, cleanup utilities. \\
+\textnormal{\texttt{tests/db/core\_workflow.rls.test.ts}} & End-to-end workflow smoke test across major entities. \\
+\textnormal{\texttt{tests/db/user\_profiles.rls.test.ts}} & Policy-level isolation checks for user profiles. \\
+\bottomrule
+\end{longtable}
+
+\section{Build and Validation Commands}
+\begin{lstlisting}[style=repo,basicstyle=\ttfamily\small]
+npm install
+npm run dev
+npm run lint
+npm test
+vitest tests/db/ --environment node
+\end{lstlisting}
+
+\end{document}

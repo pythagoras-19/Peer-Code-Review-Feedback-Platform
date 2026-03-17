@@ -1,3 +1,9 @@
+-- Demo Summary:
+-- Allows signed-in users to read the reviewer directory.
+-- Enables reviewer selection UX while keeping anonymous access out.
+-- This file only grants SELECT behavior; write policies are not defined here.
+-- Use separate SQL/migrations for directory write management.
+--
 -- ============================================================================
 -- RLS Policy for user_directory table
 -- ============================================================================
@@ -14,6 +20,7 @@ ALTER TABLE user_directory ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Authenticated users can view user directory" ON user_directory;
 
 -- Create SELECT policy: All authenticated users can read all rows
+-- Plain English: any signed-in user can list directory entries (read-only in this file).
 CREATE POLICY "Authenticated users can view user directory"
 ON user_directory
 FOR SELECT
