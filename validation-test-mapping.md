@@ -1,0 +1,77 @@
+# Validation Test Mapping
+
+This document maps the validation suites to functional requirements FR-1 through FR-17.
+
+## Auth
+
+### `tests/validation/auth.validation.test.tsx`
+
+| Requirement | Test case | Status |
+|---|---|---|
+| FR-1 | `FR-1 allows a user to create an account with an email address and password` | Covered |
+| FR-2 | `FR-2 authenticates the user through the login page` | Covered |
+| FR-3 | `FR-3 redirects unauthenticated users away from protected dashboard functionality` | Covered |
+| FR-4 | `FR-4 prevents unauthenticated users from reaching code submission flow` | Covered |
+| FR-4 | `FR-4 prevents unauthenticated users from reaching review submission flow` | Covered |
+
+## Submissions
+
+### `tests/validation/submissions.validation.test.tsx`
+
+| Requirement | Test case | Status |
+|---|---|---|
+| FR-5 | `FR-5 creates a code submission for an authenticated user and persists optional notes` | Covered |
+| FR-6 | `FR-6 requires code text before the submission flow can proceed and always includes a language tag` | Covered |
+| FR-6 | `FR-6 keeps contextual notes optional and sends null when the user leaves them blank` | Covered |
+| FR-7 | `FR-7 TODO: enable when submission editing and read-only deadline enforcement are exposed in the UI` | Blocked |
+| FR-17 | `FR-17 surfaces a submission deadline error returned by the backend` | Partially covered |
+
+## Lifecycle
+
+### `tests/validation/lifecycle.validation.test.tsx`
+
+| Requirement | Test case | Status |
+|---|---|---|
+| FR-8 | `FR-8 currently exposes newly assigned review work with an ASSIGNED status in the reviewer queue` | Partially covered |
+| FR-8 | `FR-8 TODO: enable when the platform introduces submission-level Draft, Submitted, Under Review, and Complete states` | Blocked |
+| FR-9 | `FR-9 currently marks the review assignment as completed after a successful review submission` | Partially covered |
+| FR-9 | `FR-9 TODO: enable when review work automatically transitions to Under Review on assignment or first reviewer action` | Blocked |
+| FR-9 | `FR-9 TODO: enable when submission completion is computed from required review progress` | Blocked |
+
+## Reviews
+
+### `tests/validation/reviews.validation.test.tsx`
+
+| Requirement | Test case | Status |
+|---|---|---|
+| FR-10 | `FR-10 allows an assigned reviewer to submit the currently implemented qualitative review` | Partially covered |
+| FR-11 | `FR-11 requires qualitative feedback in the current UI before a review can be submitted` | Partially covered |
+| FR-11 | `FR-11 TODO: enable when rubric ratings are implemented in the review UI and persisted in the data model` | Blocked |
+| FR-11 | `FR-11 TODO: enable when checklist selections are implemented in the review UI and persisted in the data model` | Blocked |
+| FR-12 | `FR-12 TODO: enable when submitted reviews become read-only after submission` | Blocked |
+| FR-12 | `FR-12 TODO: enable when attempts to edit a submitted review are blocked with clear feedback` | Blocked |
+
+Supporting current behavior:
+
+| Related area | Test case | Note |
+|---|---|---|
+| Review editing | `loads an existing review comment back into the editable form in the current implementation` | Documents current behavior that still diverges from FR-12 |
+
+## Visibility
+
+### `tests/validation/visibility.validation.test.tsx`
+
+| Requirement | Test case | Status |
+|---|---|---|
+| FR-13 | `FR-13 lets the submission author view completed reviews for their own submissions in read-only mode` | Covered |
+| FR-14 | `FR-14 TODO: enable when the product exposes a dedicated authored review history view` | Blocked |
+| FR-15 | `FR-15 blocks unrelated users from viewing a review they are not associated with` | Covered |
+| FR-16 | `FR-16 displays the server-generated review timestamp in read-only form alongside the review content` | Partially covered |
+| FR-17 | `FR-17 TODO: enable when review submissions enforce review deadlines and show deadline-specific UI errors` | Blocked |
+
+## Notes
+
+- These suites focus on current observable behavior in the existing Next.js and Supabase UI flows.
+- `Covered` means the requirement is validated directly by a passing test today.
+- `Partially covered` means the suite validates the implemented subset of the requirement but the full requirement is not yet present in the product.
+- `Blocked` means the requirement is not fully implemented yet, so the suite records the gap with a skipped test or TODO.
