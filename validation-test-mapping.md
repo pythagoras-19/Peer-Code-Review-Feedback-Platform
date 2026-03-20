@@ -23,7 +23,7 @@ This document maps the validation suites to functional requirements FR-1 through
 | FR-5 | `FR-5 creates a code submission for an authenticated user and persists optional notes` | Covered |
 | FR-6 | `FR-6 requires code text before the submission flow can proceed and always includes a language tag` | Covered |
 | FR-6 | `FR-6 keeps contextual notes optional and sends null when the user leaves them blank` | Covered |
-| FR-7 | `FR-7 TODO: enable when submission editing and read-only deadline enforcement are exposed in the UI` | Blocked |
+| FR-7 | No active validation test yet; submission editing and read-only deadline enforcement are not exposed in the UI | Blocked |
 | FR-17 | `FR-17 surfaces a submission deadline error returned by the backend` | Partially covered |
 
 ## Lifecycle
@@ -33,10 +33,10 @@ This document maps the validation suites to functional requirements FR-1 through
 | Requirement | Test case | Status |
 |---|---|---|
 | FR-8 | `FR-8 currently exposes newly assigned review work with an ASSIGNED status in the reviewer queue` | Partially covered |
-| FR-8 | `FR-8 TODO: enable when the platform introduces submission-level Draft, Submitted, Under Review, and Complete states` | Blocked |
+| FR-8 | No active validation test yet; submission-level Draft, Submitted, Under Review, and Complete states are not implemented | Blocked |
 | FR-9 | `FR-9 currently marks the review assignment as completed after a successful review submission` | Partially covered |
-| FR-9 | `FR-9 TODO: enable when review work automatically transitions to Under Review on assignment or first reviewer action` | Blocked |
-| FR-9 | `FR-9 TODO: enable when submission completion is computed from required review progress` | Blocked |
+| FR-9 | No active validation test yet; review work does not automatically transition to Under Review on assignment or first reviewer action | Blocked |
+| FR-9 | No active validation test yet; submission completion is not computed from required review progress | Blocked |
 
 ## Reviews
 
@@ -64,10 +64,10 @@ Supporting current behavior:
 | Requirement | Test case | Status |
 |---|---|---|
 | FR-13 | `FR-13 lets the submission author view completed reviews for their own submissions in read-only mode` | Covered |
-| FR-14 | `FR-14 TODO: enable when the product exposes a dedicated authored review history view` | Blocked |
+| FR-14 | No active validation test yet; the product does not expose a dedicated authored review history view | Blocked |
 | FR-15 | `FR-15 blocks unrelated users from viewing a review they are not associated with` | Covered |
 | FR-16 | `FR-16 displays the server-generated review timestamp in read-only form alongside the review content` | Partially covered |
-| FR-17 | `FR-17 TODO: enable when review submissions enforce review deadlines and show deadline-specific UI errors` | Blocked |
+| FR-17 | No active validation test yet; review submissions do not yet enforce review deadlines with deadline-specific UI errors | Blocked |
 
 ## Notes
 

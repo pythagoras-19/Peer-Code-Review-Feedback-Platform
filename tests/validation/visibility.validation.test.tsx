@@ -208,8 +208,4 @@ describe('validation: visibility and access requirements', () => {
     expect(screen.queryByDisplayValue(review.created_at)).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
-
-  it.skip('FR-14 TODO: enable when the product exposes a dedicated authored review history view', () => {})
-
-  it.skip('FR-17 TODO: enable when review submissions enforce review deadlines and show deadline-specific UI errors', () => {})
 })

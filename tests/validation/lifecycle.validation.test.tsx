@@ -184,10 +184,4 @@ describe('validation: lifecycle requirements', () => {
       status: 'completed',
     })
   })
-
-  it.skip('FR-8 TODO: enable when the platform introduces submission-level Draft, Submitted, Under Review, and Complete states', () => {})
-
-  it.skip('FR-9 TODO: enable when review work automatically transitions to Under Review on assignment or first reviewer action', () => {})
-
-  it.skip('FR-9 TODO: enable when submission completion is computed from required review progress', () => {})
 })

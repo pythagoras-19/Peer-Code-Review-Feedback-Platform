@@ -224,6 +224,4 @@ describe('validation: submission requirements', () => {
       expect.stringContaining('submission deadline has passed')
     )
   })
-
-  it.skip('FR-7 TODO: enable when submission editing and read-only deadline enforcement are exposed in the UI', () => {})
 })

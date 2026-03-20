@@ -2,10 +2,11 @@
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest'
 import {
-  adminClient,
   assertSupabaseReachable,
   createTestUser,
-  deleteTestUser
+  dbTestsEnabled,
+  deleteTestUser,
+  getAdminClient
 } from './helpers'
 
 type TestUser = {
@@ -13,7 +14,9 @@ type TestUser = {
   email: string
 }
 
-describe('core workflow smoke', () => {
+const describeDb = dbTestsEnabled ? describe : describe.skip
+
+describeDb('core workflow smoke', () => {
   let author: TestUser | null = null
   let reviewer: TestUser | null = null
 
@@ -28,6 +31,8 @@ describe('core workflow smoke', () => {
     if (!author || !reviewer) {
       throw new Error('Test users not initialized')
     }
+
+    const adminClient = getAdminClient()
 
     const assignmentsToDelete: string[] = []
     const submissionsToDelete: string[] = []

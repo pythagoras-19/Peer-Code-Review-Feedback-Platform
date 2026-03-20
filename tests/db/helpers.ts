@@ -15,13 +15,38 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 const testPassword = process.env.TEST_PASSWORD || 'TestPassword123!TestPassword123!'
 const testEmailDomain = process.env.TEST_EMAIL_DOMAIN || 'example.test'
 
-if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Ensure SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY are set in .env.test'
-  )
+export const dbTestsEnabled = process.env.RUN_DB_TESTS === 'true'
+
+function assertDbEnvConfigured() {
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    throw new Error(
+      'Missing Supabase environment variables. Ensure SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY are set in .env.test'
+    )
+  }
+}
+
+let adminClientInstance: ReturnType<typeof createClient> | null = null
+
+export function getAdminClient() {
+  assertDbEnvConfigured()
+
+  if (!adminClientInstance) {
+    adminClientInstance = createClient(supabaseUrl, serviceRoleKey, {
+      global: { fetch: undiciFetch as any },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      }
+    })
+  }
+
+  return adminClientInstance
 }
 
 export async function assertSupabaseReachable() {
+  assertDbEnvConfigured()
+
   const res = await undiciFetch(`${supabaseUrl}/auth/v1/health`, {
     headers: { apikey: anonKey }
   })
@@ -31,16 +56,8 @@ export async function assertSupabaseReachable() {
   }
 }
 
-export const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-  global: { fetch: undiciFetch as any },
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false
-  }
-})
-
 export async function createTestUser(prefix: string) {
+  const adminClient = getAdminClient()
   const nonce = `${Date.now()}-${Math.random().toString(16).slice(2)}`
   const email = `${prefix}.${nonce}@${testEmailDomain}`
 
@@ -78,6 +95,7 @@ export async function createTestUser(prefix: string) {
 }
 
 export async function deleteTestUser(userId: string) {
+  const adminClient = getAdminClient()
   const { error } = await adminClient.auth.admin.deleteUser(userId)
   if (error) console.warn(`Failed to delete test user ${userId}: ${error.message}`)
 }

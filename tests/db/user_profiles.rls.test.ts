@@ -2,7 +2,12 @@
 
 import { describe, it, beforeAll, afterAll, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createTestUser, deleteTestUser, assertSupabaseReachable } from './helpers'
+import {
+  assertSupabaseReachable,
+  createTestUser,
+  dbTestsEnabled,
+  deleteTestUser,
+} from './helpers'
 
 // Helper to wait for user_profiles row to be created
 async function waitForProfile(userId: string, client: SupabaseClient, timeoutMs = 20000) {
@@ -24,7 +29,9 @@ async function waitForProfile(userId: string, client: SupabaseClient, timeoutMs 
   throw new Error(`Timed out waiting for user_profiles row for user_id=${userId}`)
 }
 // Tests for RLS policies on user_profiles table
-describe('user_profiles RLS', () => {
+const describeDb = dbTestsEnabled ? describe : describe.skip
+
+describeDb('user_profiles RLS', () => {
   let userA: { userId: string; email: string; client: SupabaseClient } | null = null
   let userB: { userId: string; email: string; client: SupabaseClient } | null = null
 
