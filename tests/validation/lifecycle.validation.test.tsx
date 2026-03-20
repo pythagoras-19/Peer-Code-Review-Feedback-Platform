@@ -161,6 +161,10 @@ describe('validation: lifecycle requirements', () => {
 
     await screen.findByText(assignment.title)
 
+    await user.selectOptions(screen.getByLabelText(/code quality score/i), '4')
+    await user.selectOptions(screen.getByLabelText(/readability score/i), '4')
+    await user.selectOptions(screen.getByLabelText(/correctness score/i), '5')
+    await user.selectOptions(screen.getByLabelText(/security score/i), '4')
     await user.type(
       screen.getByLabelText(/overall comment/i),
       'The decomposition is clear and easy to follow.'

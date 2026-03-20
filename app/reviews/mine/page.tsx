@@ -3,13 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppShell from '@/components/AppShell'
+import {
+  REVIEW_CHECKLIST_FIELDS,
+  REVIEW_SCORE_FIELDS,
+  type ReviewRecord,
+} from '@/lib/reviews'
 import { supabase } from '@/lib/supabaseClient'
-
-type ReviewRow = {
-  id: string
-  overall_comment: string | null
-  created_at: string
-}
 
 type AssignmentRow = {
   id: string
@@ -28,7 +27,7 @@ type ReviewAssignmentRow = {
   status: string
   assigned_at: string
   submission: SubmissionRow | SubmissionRow[] | null
-  review: ReviewRow | ReviewRow[] | null
+  review: ReviewRecord | ReviewRecord[] | null
 }
 
 type ReviewCard = {
@@ -36,8 +35,19 @@ type ReviewCard = {
   assignmentTitle: string
   submissionLanguage: string
   reviewStatus: string
-  reviewCreatedAt: string
+  reviewSubmittedAt: string
   overallComment: string
+  review: Pick<
+    ReviewRecord,
+    | 'code_quality_score'
+    | 'readability_score'
+    | 'correctness_score'
+    | 'security_score'
+    | 'checklist_clear_naming'
+    | 'checklist_consistent_formatting'
+    | 'checklist_handles_edge_cases'
+    | 'checklist_logic_is_easy_to_follow'
+  >
 }
 
 const normalizeToObject = <T,>(value: T | T[] | null | undefined): T | null => {
@@ -85,7 +95,17 @@ export default function MySubmissionReviewsPage() {
           review:reviews!inner (
             id,
             overall_comment,
-            created_at
+            created_at,
+            updated_at,
+            code_quality_score,
+            readability_score,
+            correctness_score,
+            security_score,
+            checklist_clear_naming,
+            checklist_consistent_formatting,
+            checklist_handles_edge_cases,
+            checklist_logic_is_easy_to_follow,
+            submitted_at
           )
         `)
         .eq('submission.author_id', userData.user.id)
@@ -108,17 +128,29 @@ export default function MySubmissionReviewsPage() {
         const review = normalizeToObject(row.review)
         const assignment = normalizeToObject(submission?.assignment)
 
-        const comment = review?.overall_comment?.trim()
+        const comment = review?.overall_comment?.trim() ?? ''
 
-        if (!submission || !review || !comment) return acc
+        if (!submission || !review || !review.submitted_at) return acc
 
         acc.push({
           id: row.id,
           assignmentTitle: assignment?.title ?? 'Unknown Assignment',
           submissionLanguage: submission.language ?? 'Unknown',
           reviewStatus: row.status ?? 'Unknown',
-          reviewCreatedAt: review.created_at,
+          reviewSubmittedAt: review.submitted_at,
           overallComment: comment,
+          review: {
+            code_quality_score: review.code_quality_score,
+            readability_score: review.readability_score,
+            correctness_score: review.correctness_score,
+            security_score: review.security_score,
+            checklist_clear_naming: review.checklist_clear_naming,
+            checklist_consistent_formatting:
+              review.checklist_consistent_formatting,
+            checklist_handles_edge_cases: review.checklist_handles_edge_cases,
+            checklist_logic_is_easy_to_follow:
+              review.checklist_logic_is_easy_to_follow,
+          },
         })
 
         return acc
@@ -174,9 +206,33 @@ export default function MySubmissionReviewsPage() {
                       <strong>Review Status:</strong> {review.reviewStatus}
                     </p>
                     <p>
-                      <strong>Review Created:</strong>{' '}
-                      {new Date(review.reviewCreatedAt).toLocaleDateString()}
+                      <strong>Review Submitted:</strong>{' '}
+                      {new Date(review.reviewSubmittedAt).toLocaleString()}
                     </p>
+                    <div className="review-summary-section">
+                      <strong>Rubric Scores:</strong>
+                      <div className="review-summary-grid">
+                        {REVIEW_SCORE_FIELDS.map((field) => (
+                          <p key={field.key}>
+                            <strong>{field.label.replace(' Score', '')}:</strong>{' '}
+                            {review.review[field.key] == null
+                              ? 'Not provided'
+                              : `${review.review[field.key]}/5`}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="review-summary-section">
+                      <strong>Checklist:</strong>
+                      <div className="review-summary-grid">
+                        {REVIEW_CHECKLIST_FIELDS.map((field) => (
+                          <p key={field.key}>
+                            <strong>{field.label}:</strong>{' '}
+                            {review.review[field.key] ? 'Yes' : 'No'}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
                     <p>
                       <strong>Overall Comment:</strong> {review.overallComment}
                     </p>

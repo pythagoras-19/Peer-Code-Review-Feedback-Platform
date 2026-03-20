@@ -91,6 +91,18 @@ describe('validation: visibility and access requirements', () => {
                 id: review.id,
                 overall_comment: review.overall_comment,
                 created_at: review.created_at,
+                updated_at: review.updated_at,
+                code_quality_score: review.code_quality_score,
+                readability_score: review.readability_score,
+                correctness_score: review.correctness_score,
+                security_score: review.security_score,
+                checklist_clear_naming: review.checklist_clear_naming,
+                checklist_consistent_formatting:
+                  review.checklist_consistent_formatting,
+                checklist_handles_edge_cases: review.checklist_handles_edge_cases,
+                checklist_logic_is_easy_to_follow:
+                  review.checklist_logic_is_easy_to_follow,
+                submitted_at: review.submitted_at,
               },
             },
           ],
@@ -104,6 +116,10 @@ describe('validation: visibility and access requirements', () => {
     expect(await screen.findByText(assignment.title)).toBeInTheDocument()
     expect(screen.getByText(/strong organization and good separation of concerns/i)).toBeInTheDocument()
     expect(screen.getByText(/completed/i)).toBeInTheDocument()
+    expect(screen.getByText(/code quality:/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/4\/5/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/clear naming:/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/^yes$/i).length).toBeGreaterThan(0)
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
@@ -157,6 +173,18 @@ describe('validation: visibility and access requirements', () => {
                 id: review.id,
                 overall_comment: review.overall_comment,
                 created_at: review.created_at,
+                updated_at: review.updated_at,
+                code_quality_score: review.code_quality_score,
+                readability_score: review.readability_score,
+                correctness_score: review.correctness_score,
+                security_score: review.security_score,
+                checklist_clear_naming: review.checklist_clear_naming,
+                checklist_consistent_formatting:
+                  review.checklist_consistent_formatting,
+                checklist_handles_edge_cases: review.checklist_handles_edge_cases,
+                checklist_logic_is_easy_to_follow:
+                  review.checklist_logic_is_easy_to_follow,
+                submitted_at: review.submitted_at,
               },
             },
           ],
@@ -167,10 +195,14 @@ describe('validation: visibility and access requirements', () => {
 
     render(<ReviewsMinePage />)
 
-    const expectedDate = new Date(review.created_at).toLocaleDateString()
+    const expectedDate = new Date(review.submitted_at as string)
+      .toLocaleString()
+      .replace(/\s+/g, ' ')
 
     await waitFor(() => {
-      expect(screen.getByText(expectedDate)).toBeInTheDocument()
+      expect(
+        screen.getByText((content) => content.replace(/\s+/g, ' ') === expectedDate)
+      ).toBeInTheDocument()
     })
 
     expect(screen.queryByDisplayValue(review.created_at)).not.toBeInTheDocument()

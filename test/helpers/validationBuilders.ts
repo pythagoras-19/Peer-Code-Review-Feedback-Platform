@@ -40,6 +40,15 @@ type ReviewOverride = Partial<{
   overall_comment: string | null
   created_at: string
   updated_at: string
+  code_quality_score: number | null
+  readability_score: number | null
+  correctness_score: number | null
+  security_score: number | null
+  checklist_clear_naming: boolean
+  checklist_consistent_formatting: boolean
+  checklist_handles_edge_cases: boolean
+  checklist_logic_is_easy_to_follow: boolean
+  submitted_at: string | null
 }>
 
 export const buildUser = (overrides: UserOverride = {}) => ({
@@ -114,6 +123,15 @@ export const buildReview = (overrides: ReviewOverride = {}) => ({
   overall_comment: 'Solid structure and clear decomposition.',
   created_at: '2026-03-17T14:00:00.000Z',
   updated_at: '2026-03-17T14:00:00.000Z',
+  code_quality_score: 4,
+  readability_score: 4,
+  correctness_score: 5,
+  security_score: 4,
+  checklist_clear_naming: true,
+  checklist_consistent_formatting: true,
+  checklist_handles_edge_cases: false,
+  checklist_logic_is_easy_to_follow: true,
+  submitted_at: '2026-03-17T14:05:00.000Z',
   ...overrides,
 })
 

@@ -208,6 +208,12 @@ body {
   margin: 0;
 }
 
+.form-success {
+  font-size: 0.85rem;
+  color: #145a32;
+  margin: 0;
+}
+
 .auth-error-message {
   padding: 0.75rem;
   background-color: #fadbd8;
@@ -394,6 +400,11 @@ body {
   color: #155724;
 }
 
+.status-completed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
 .activity-list {
   list-style: none;
   padding: 0;
@@ -455,6 +466,11 @@ body {
 
   .btn {
     width: 100%;
+  }
+
+  .review-form-grid,
+  .review-summary-grid {
+    grid-template-columns: 1fr;
   }
 
   .dashboard-container {
@@ -616,6 +632,48 @@ body {
 .review-actions {
   display: flex;
   gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.review-readonly-notice {
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  background-color: #eef6ff;
+  color: #1f4f82;
+}
+
+.review-form-grid,
+.review-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.review-checklist {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.review-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #333;
+}
+
+.review-checkbox-row input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.review-summary-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.review-summary-section p {
+  margin-bottom: 0;
 }
 
 /* =========================================================

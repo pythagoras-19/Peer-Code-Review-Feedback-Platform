@@ -44,18 +44,18 @@ This document maps the validation suites to functional requirements FR-1 through
 
 | Requirement | Test case | Status |
 |---|---|---|
-| FR-10 | `FR-10 allows an assigned reviewer to submit the currently implemented qualitative review` | Partially covered |
-| FR-11 | `FR-11 requires qualitative feedback in the current UI before a review can be submitted` | Partially covered |
-| FR-11 | `FR-11 TODO: enable when rubric ratings are implemented in the review UI and persisted in the data model` | Blocked |
-| FR-11 | `FR-11 TODO: enable when checklist selections are implemented in the review UI and persisted in the data model` | Blocked |
-| FR-12 | `FR-12 TODO: enable when submitted reviews become read-only after submission` | Blocked |
-| FR-12 | `FR-12 TODO: enable when attempts to edit a submitted review are blocked with clear feedback` | Blocked |
+| FR-10 | `FR-10 allows an assigned reviewer to submit the currently implemented qualitative review` | Covered |
+| FR-11 | `FR-11 requires qualitative feedback in the current UI before a review can be submitted` | Covered |
+| FR-11 | `FR-11 allows a reviewer to save a draft with partial rubric values before final submission` | Covered |
+| FR-11 | `FR-11 persists checklist selections in the review payload` | Covered |
+| FR-12 | `FR-12 submitted reviews become read-only after submission` | Covered |
+| FR-12 | `FR-12 blocks attempts to edit a submitted review with clear feedback` | Covered |
 
 Supporting current behavior:
 
 | Related area | Test case | Note |
 |---|---|---|
-| Review editing | `loads an existing review comment back into the editable form in the current implementation` | Documents current behavior that still diverges from FR-12 |
+| Review editing | `loads an existing draft review back into the editable form in the current implementation` | Documents pre-submission editing behavior for in-progress reviews |
 
 ## Visibility
 
