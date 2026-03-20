@@ -208,4 +208,107 @@ describe('validation: visibility and access requirements', () => {
     expect(screen.queryByDisplayValue(review.created_at)).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
+
+  it('redirects unauthenticated authors away from the received reviews page', async () => {
+    supabaseMock = createMockSupabaseBrowserClient({
+      auth: {
+        getUser: {
+          data: { user: null },
+          error: null,
+        },
+      },
+    })
+
+    render(<ReviewsMinePage />)
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/login')
+    })
+  })
+
+  it('shows an error state when received reviews cannot be loaded', async () => {
+    supabaseMock = createMockSupabaseBrowserClient({
+      auth: {
+        getUser: {
+          data: { user: buildSupabaseUser(author).user },
+          error: null,
+        },
+      },
+      tables: {
+        review_assignments: async () => ({
+          data: null,
+          error: mockSupabaseError('fetch failed', 500, 'PGRST999'),
+        }),
+      },
+    })
+
+    render(<ReviewsMinePage />)
+
+    expect(
+      await screen.findByText(/we could not load your reviews right now\. please try again\./i)
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/no reviews received yet/i)).not.toBeInTheDocument()
+  })
+
+  it('excludes draft reviews without submitted_at from the author-visible review list', async () => {
+    const draftReview = buildReview({
+      overall_comment: 'Still drafting this feedback.',
+      submitted_at: null,
+    })
+
+    supabaseMock = createMockSupabaseBrowserClient({
+      auth: {
+        getUser: {
+          data: { user: buildSupabaseUser(author).user },
+          error: null,
+        },
+      },
+      tables: {
+        review_assignments: async () => ({
+          data: [
+            {
+              id: reviewAssignment.id,
+              status: 'assigned',
+              assigned_at: reviewAssignment.assigned_at,
+              submission: {
+                id: submission.id,
+                author_id: author.id,
+                language: submission.language,
+                assignment: {
+                  id: assignment.id,
+                  title: assignment.title,
+                },
+              },
+              review: {
+                id: draftReview.id,
+                overall_comment: draftReview.overall_comment,
+                created_at: draftReview.created_at,
+                updated_at: draftReview.updated_at,
+                code_quality_score: draftReview.code_quality_score,
+                readability_score: draftReview.readability_score,
+                correctness_score: draftReview.correctness_score,
+                security_score: draftReview.security_score,
+                checklist_clear_naming: draftReview.checklist_clear_naming,
+                checklist_consistent_formatting:
+                  draftReview.checklist_consistent_formatting,
+                checklist_handles_edge_cases:
+                  draftReview.checklist_handles_edge_cases,
+                checklist_logic_is_easy_to_follow:
+                  draftReview.checklist_logic_is_easy_to_follow,
+                submitted_at: draftReview.submitted_at,
+              },
+            },
+          ],
+          error: null,
+        }),
+      },
+    })
+
+    render(<ReviewsMinePage />)
+
+    expect(await screen.findByText(/no reviews received yet/i)).toBeInTheDocument()
+    expect(
+      screen.queryByText(/still drafting this feedback/i)
+    ).not.toBeInTheDocument()
+  })
 })

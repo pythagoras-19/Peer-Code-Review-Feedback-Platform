@@ -11,6 +11,7 @@ import {
   buildUser,
 } from '@/test/helpers/validationBuilders'
 import { createMockSupabaseBrowserClient } from '@/test/mocks/supabaseBrowserClientMock'
+import { mockSupabaseError } from '@/test/mocks/supabaseClientMock'
 
 const mockPush = vi.fn()
 const mockRouter = { push: mockPush }
@@ -327,5 +328,191 @@ describe('validation: review workflow requirements', () => {
 
     expect(commentField).toHaveValue('Locked feedback.')
     expect(screen.getByText(/can no longer be edited/i)).toBeInTheDocument()
+  })
+
+  it('shows an error state when the assigned review cannot be loaded', async () => {
+    supabaseMock = createMockSupabaseBrowserClient({
+      auth: {
+        getUser: {
+          data: { user: buildSupabaseUser(reviewer).user },
+          error: null,
+        },
+      },
+      tables: {
+        review_assignments: async () => ({
+          data: null,
+          error: mockSupabaseError('Unexpected failure', 500, 'PGRST999'),
+        }),
+      },
+    })
+
+    render(<ReviewPage />)
+
+    expect(await screen.findByText(/unable to load review/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/unable to load this review assignment/i)
+    ).toBeInTheDocument()
+  })
+
+  it('redirects to login if the reviewer session expires before saving', async () => {
+    const user = userEvent.setup()
+
+    render(<ReviewPage />)
+
+    await screen.findByText(assignment.title)
+
+    supabaseMock.supabase.auth.getUser.mockResolvedValue({
+      data: { user: null },
+      error: null,
+    })
+
+    await user.selectOptions(screen.getByLabelText(/code quality score/i), '5')
+    await user.selectOptions(screen.getByLabelText(/readability score/i), '5')
+    await user.selectOptions(screen.getByLabelText(/correctness score/i), '5')
+    await user.selectOptions(screen.getByLabelText(/security score/i), '5')
+    await user.type(screen.getByLabelText(/overall comment/i), 'Session expired.')
+    await user.click(screen.getByRole('button', { name: /submit review/i }))
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/login')
+    })
+
+    expect(supabaseMock.getLastQuery('reviews', 'upsert')).toBeUndefined()
+  })
+
+  it('shows a submit error when the review write fails', async () => {
+    const user = userEvent.setup()
+
+    supabaseMock = createMockSupabaseBrowserClient({
+      auth: {
+        getUser: {
+          data: { user: buildSupabaseUser(reviewer).user },
+          error: null,
+        },
+      },
+      tables: {
+        review_assignments: async (context) => {
+          if (context.action === 'select') {
+            return {
+              data: {
+                id: reviewAssignment.id,
+                status: reviewAssignment.status,
+                assigned_at: reviewAssignment.assigned_at,
+                submission: {
+                  id: submission.id,
+                  language: submission.language,
+                  code_text: submission.code_text,
+                  created_at: submission.created_at,
+                  assignment: {
+                    id: assignment.id,
+                    title: assignment.title,
+                    review_due: assignment.review_due,
+                  },
+                },
+              },
+              error: null,
+            }
+          }
+
+          return { data: null, error: null }
+        },
+        reviews: async (context) => {
+          if (context.action === 'select') {
+            return { data: null, error: null }
+          }
+
+          return {
+            data: null,
+            error: mockSupabaseError('write failed', 500, '23514'),
+          }
+        },
+      },
+    })
+
+    render(<ReviewPage />)
+
+    await screen.findByText(assignment.title)
+
+    await user.selectOptions(screen.getByLabelText(/code quality score/i), '4')
+    await user.selectOptions(screen.getByLabelText(/readability score/i), '4')
+    await user.selectOptions(screen.getByLabelText(/correctness score/i), '4')
+    await user.selectOptions(screen.getByLabelText(/security score/i), '4')
+    await user.type(screen.getByLabelText(/overall comment/i), 'Save should fail.')
+    await user.click(screen.getByRole('button', { name: /submit review/i }))
+
+    expect(
+      await screen.findByText(/unable to submit your review\. please try again\./i)
+    ).toBeInTheDocument()
+    expect(supabaseMock.getLastQuery('review_assignments', 'update')).toBeUndefined()
+  })
+
+  it('shows a partial success message when the review saves but status update fails', async () => {
+    const user = userEvent.setup()
+
+    supabaseMock = createMockSupabaseBrowserClient({
+      auth: {
+        getUser: {
+          data: { user: buildSupabaseUser(reviewer).user },
+          error: null,
+        },
+      },
+      tables: {
+        review_assignments: async (context) => {
+          if (context.action === 'select') {
+            return {
+              data: {
+                id: reviewAssignment.id,
+                status: reviewAssignment.status,
+                assigned_at: reviewAssignment.assigned_at,
+                submission: {
+                  id: submission.id,
+                  language: submission.language,
+                  code_text: submission.code_text,
+                  created_at: submission.created_at,
+                  assignment: {
+                    id: assignment.id,
+                    title: assignment.title,
+                    review_due: assignment.review_due,
+                  },
+                },
+              },
+              error: null,
+            }
+          }
+
+          if (context.action === 'update') {
+            return {
+              data: null,
+              error: mockSupabaseError('status update failed', 500, '23514'),
+            }
+          }
+
+          return { data: null, error: null }
+        },
+        reviews: async () => ({
+          data: null,
+          error: null,
+        }),
+      },
+    })
+
+    render(<ReviewPage />)
+
+    await screen.findByText(assignment.title)
+
+    await user.selectOptions(screen.getByLabelText(/code quality score/i), '5')
+    await user.selectOptions(screen.getByLabelText(/readability score/i), '5')
+    await user.selectOptions(screen.getByLabelText(/correctness score/i), '5')
+    await user.selectOptions(screen.getByLabelText(/security score/i), '5')
+    await user.type(
+      screen.getByLabelText(/overall comment/i),
+      'The review saves, but the status update fails.'
+    )
+    await user.click(screen.getByRole('button', { name: /submit review/i }))
+
+    expect(
+      await screen.findByText(/review saved, but status could not be updated\./i)
+    ).toBeInTheDocument()
+    expect(screen.getByText('ASSIGNED')).toBeInTheDocument()
   })
 })
