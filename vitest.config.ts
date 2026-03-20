@@ -15,6 +15,7 @@ export default defineConfig({
       html: 'vitest-report.html',
     },
     coverage: {
+      enabled: true,
       provider: 'v8',
       reportsDirectory: './coverage',
       reporter: ['text', 'html'],
@@ -35,6 +36,7 @@ export default defineConfig({
         '**/out/**',
         '**/.vercel/**',
 
+        'tests/db/**',
         '**/tests/**',
         '**/__tests__/**',
         '**/test/**',
