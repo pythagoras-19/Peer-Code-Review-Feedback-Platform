@@ -387,6 +387,47 @@ See [DB_TESTING.md](DB_TESTING.md) for detailed testing documentation.
 
 ---
 
+## Code Coverage
+
+Vitest coverage is enabled for the main application workflows, with the strongest focus on CORE user flows such as authentication, dashboard behavior, submission handling, reviewer assignment, and review completion.
+
+| Metric | Result |
+|-------|--------|
+| Statements | 82.66% |
+| Branches | 73.93% |
+| Functions | 89.61% |
+| Lines | 82.66% |
+
+### What Is Covered
+
+- Authentication flows and session handling
+- Dashboard loading, success, and error states
+- Submission and review workflow validation
+- Reviewer assignment business logic
+- Review visibility and access-control behavior
+
+### Running Coverage
+
+```bash
+npm run coverage
+```
+
+### HTML Coverage Report
+
+After the coverage run completes, open the generated HTML report at:
+
+```text
+coverage/index.html
+```
+
+### Notes
+
+- Coverage reporting is generated into the `./coverage` directory
+- Database-only tests under `tests/db/**` are excluded from coverage because they depend on live Supabase connectivity
+- Framework wrapper files such as `layout.tsx` are not a testing priority compared with core workflow logic
+
+---
+
 ## Local Development Setup
 
 ### Prerequisites
@@ -446,7 +487,7 @@ npm test -- --watch
 vitest tests/db/ --environment node
 
 # Generate coverage report
-npm run test:coverage
+npm run coverage
 ```
 
 ---
