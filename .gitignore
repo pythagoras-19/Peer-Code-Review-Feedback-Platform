@@ -5,6 +5,11 @@
 
 # testing
 /coverage
+/vitest-report.html
+/html.meta.json.gz
+/bg.png
+/favicon.svg
+/assets/
 
 # next.js
 /.next/

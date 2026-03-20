@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest",
+    "test:report": "vitest run",
     "test:db": "RUN_DB_TESTS=true vitest run --config vitest.db.config.ts",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",

@@ -10,6 +10,10 @@ export default defineConfig({
     setupFiles: ['./test/setup.ts'],
     css: true,
     exclude: [...configDefaults.exclude, 'tests/db/**'],
+    reporters: ['default', 'html'],
+    outputFile: {
+      html: 'vitest-report.html',
+    },
     coverage: {
       provider: 'v8',
       reportsDirectory: './coverage',
