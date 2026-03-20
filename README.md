@@ -85,15 +85,10 @@ This platform solves these problems by:
 - **Peer Reviewer Selection UI** - Students explicitly select peer reviewers from the user directory
 - **Code Review Interface** - Structured review page with code display and comment textarea
 - **Row Level Security** - Database policies enforce user isolation and access control
-
-### Planned (Not Yet Implemented)
-
 - Persistent storage of assignments and submissions
 - Persistent storage of reviews and feedback
 - Rubric-based scoring system
 - Comment threads within code reviews
-- Gradebook and analytics dashboard
-- Email notifications
 
 ---
 
